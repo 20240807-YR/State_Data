@@ -249,3 +249,5 @@ core2_tf/bin/f2py
 mlflow.db
 core2_tf/bin/f2py
 core2_tf/bin/import_pb_to_tensorboard
+core2_tf/pyvenv.cfg
+core2_tf/pyvenv.cfg
