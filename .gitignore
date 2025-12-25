@@ -205,3 +205,47 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Virtual environments
+.venv/
+venv/
+core2_tf/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Local experiment outputs
+val_*
+error_std*
+dataset*
+lookback*
+horizon*
+model_type*
+stage*
+noise_sigma*
+sampling_gap*
+meta.yaml
+core2_tf/bin/f2py
+core2_tf/bin/toco
+core2_tf/bin/tflite_convert
+core2_tf/bin/tf_upgrade_v2
+core2_tf/bin/saved_model_cli
+core2_tf/bin/tensorboard
+core2_tf/bin/numpy-config
+core2_tf/bin/f2py
+core2_tf/bin/import_pb_to_tensorboard
+core2_tf/bin/toco
+core2_tf/bin/toco
+core2_tf/bin/toco
+core2_tf/bin/tflite_convert
+core2_tf/bin/tf_upgrade_v2
+core2_tf/bin/saved_model_cli
+core2_tf/bin/f2py
+mlflow.db
+core2_tf/bin/f2py
+core2_tf/bin/import_pb_to_tensorboard

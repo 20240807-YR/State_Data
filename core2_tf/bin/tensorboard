@@ -1,4 +1,4 @@
-#!/Users/mac/Desktop/HW/State_Data/core2_tf/bin/python3.10
+#!/Users/mac/Desktop/HW/State_Data/core2_tf/bin/python
 import sys
 from tensorboard.main import run_main
 if __name__ == '__main__':
