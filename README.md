@@ -140,3 +140,90 @@
 
 * 최종 결론 : 상태 기반 계측·관리 구조는 스마트그리드와 배터리 관리 영역뿐 아니라, 보험 리스크 관리에도 동일하게 적용 가능한 산업 인프라 설계 원리임을 확인하였다.
 μHSM은 보험을 사건 사후 보상 구조에서, 상태 열화를 관리하는 사전 개입 금융 구조로 전환하기 위한 핵심 관측 단위로 기능한다.
+
+---
+## 파일 정리 
+
+### 📅 12월 25일: Core 1 — Health State Backbone & State Variable 정의 (12_25_core1main.ipynb)
+* 헬스케어 시계열 Backbone 데이터 로드 및 구조 확인 후 health_timeseries_core_backbone.csv 파일을 로드했습니다.
+* date 컬럼을 datetime으로 변환하고 user_id, date 기준으로 정렬하고 전체 row 수, 사용자 수, 날짜 범위를 확인했습니다. 그 다음 컬럼별 결측치 개수를 점검했습니다.
+* (user_id, date) 기준 중복 행 존재 여부를 확인했습니다. 그리고 사용자별 관측 일수 분포(days per user)를 요약했습니다.
+* 사용자 샘플 시계열 시각화 하여 상태가 사건이 아님을 확인하였다. 이후에 샘플 사용자 3명을 추출했습니다.
+  * 심박 상태 시계열
+  * mean_hr
+  * hr_std
+  * 활동량 시계열
+  * steps
+  * calories
+  * 수면 시계열
+  * sleep_minutes
+* 모든 변수들이 단발 이벤트가 아니라 연속적 상태 변화임을 시각적으로 확인하고 상태 변수 정의 (State Variables)하였습니다. 
+* 상태 변수로 다음 컬럼을 사용했습니다.
+  * mean_hr
+  * hr_std
+  * steps
+  * sleep_minutes
+* 사용자 기준 Z-score 정규화하고 사용자별 평균·표준편차 기준으로 Z-score를 계산했습니다.분산이 0이거나 결측인 경우 Z-score를 0으로 처리했습니다.
+* 방향성 보정
+  * steps_z → 부하 감소 방향이므로 부호 반전
+  * sleep_minutes_z → 회복 지표이므로 부호 반전
+  * Health State Level 계산 (12_25_core1main.ipynb)
+  * 정규화된 상태 변수들의 평균으로 상태 레벨을 정의했습니다.
+* 계산식
+  * health_state_level = (mean_hr_z + hr_std_z + steps_z + sleep_minutes_z) / 4
+* ealth State Speed 계산 (열화 속도) (12_25_core1main.ipynb)
+  * WINDOW = 7 기준 rolling window를 사용했습니다.
+  * 각 시점에서 과거 상태 레벨의 기울기(선형 회귀 slope)를 계산했습니다.
+  * 사용자별로 정렬 후 health_state_speed 컬럼을 생성했습니다.
+  * 상태의 “수준(Level)”과 “변화 속도(Speed)”를 명확히 분리했습니다. 이후 SOH(상태 수준) + 열화율 대응 논리 고정하였습니다. 
+* 최종 Health State Index 정의 (12_25_core1main.ipynb)
+  * 상태 수준과 속도를 결합한 단일 지표를 정의했습니다.
+* 계산식
+  * health_state_index = health_state_level + health_state_speed * WINDOW
+* 상태 분포 확인 (사건 아님 재검증) (12_25_core1main.ipynb)
+  * 샘플 사용자별 health_state_index 분포 통계를 출력했습니다.
+  * 상태가 이산 이벤트가 아닌 연속 분포 상태 변수임을 재확인했습니다.
+* Core State CSV 저장 (12_25_core1main.ipynb)
+* 출력 컬럼
+  * user_id, date
+* 원천 상태 변수
+  * health_state_level
+  * health_state_speed
+  * health_state_index
+* 저장 파일 : ../data_csv/health_timeseries_core_state.csv
+
+⸻
+
+📅 12월 25일: Core 1 — 원천 Fitbit 데이터 병합 (Backbone 생성)
+* 원천 CSV 컬럼 구조 확인 (12_25_csv파일merge.ipynb)
+  * heartrate_seconds_merged.csv
+  * dailyActivity_merged.csv
+  * sleepDay_merged.csv
+  * 각 파일의 컬럼 목록을 출력해 구조를 사전 점검했습니다.
+* 활동 데이터 일 단위 Backbone 생성하였습니다. 
+  * dailyActivity_merged.csv에서
+  * ActivityDate → date
+  * TotalSteps → steps
+  * Calories → calories
+  * 사용자–날짜 기준 일 단위 activity backbone을 생성했습니다.
+* 심박 데이터 일 단위 집계하였습니다. 
+  * heartrate_seconds_merged.csv에서 아래를 계산했습니다.
+  * Time → date
+  * 사용자–날짜 기준으로
+  * 평균 심박(mean_hr)
+  * 심박 표준편차(hr_std)
+* 수면 데이터 일 단위 Backbone 생성하였습니다. 
+  * sleepDay_merged.csv에서
+  * SleepDay → date
+  * TotalMinutesAsleep → sleep_minutes
+  * 사용자–날짜 기준 수면 backbone을 구성했습니다.
+  * 헬스케어 시계열 Backbone 병합하였습니다.
+* 병합 순서
+	1.	activity × heart rate (left join)
+	2.	결과 × sleep (left join)
+  * 병합 키
+  * user_id
+  * date
+* 병합 후 사용자 수, 날짜 수, 결측 요약을 점검했습니다.
+* Core Backbone CSV 저장 (12_25_csv파일merge.ipynb)
+  * 저장 파일 : ../data_csv/health_timeseries_core_backbone.csv
