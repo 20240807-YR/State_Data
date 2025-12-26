@@ -227,3 +227,65 @@
 * 병합 후 사용자 수, 날짜 수, 결측 요약을 점검했습니다.
 * Core Backbone CSV 저장 (12_25_csv파일merge.ipynb)
   * 저장 파일 : ../data_csv/health_timeseries_core_backbone.csv
+
+### 📅 12월 25일: Core 2 — Health State Δ예측 (12_25_prediction.ipynb)
+* Core 1 상태 CSV 로드 및 정합성 확인하고 health_timeseries_core_state.csv 파일을 로드했습니다. 그리고 date 컬럼을 datetime으로 변환했습니다.
+* (user_id, date) 기준으로 평균 집계를 수행해 중복을 정리한 후 사용자·날짜 기준으로 정렬했습니다.그리고 전체 row 수, 사용자 수, health_state_index 결측 여부를 확인했습니다.
+* Supervised Dataset 구성 (Δstate 예측 문제 정의) (12_25_prediction.ipynb)
+  * 예측 문제를 상태 절대값이 아닌 상태 변화량(Δstate) 예측으로 정의했습니다.
+  * 입력(X)
+     * 과거 LOOKBACK = 14일의 health_state_inde 
+  * 타깃(y)
+     * t + HORIZON(7) 시점의
+health_state_index(t+h) - health_state_index(t)
+* 사용자별 시계열을 유지한 상태로 sliding window를 구성했습니다.
+* 출력
+  * X: (N, lookback)
+  * y: (N,)
+  * meta: user_id, t_date, target_date
+* Time-based Train / Validation 분리하여 target_date 기준으로 전체 샘플을 시간 순 정렬했습니다.
+* 앞 80%를 train, 뒤 20%를 validation으로 분리한 후 사용자 섞임은 허용하되 미래 정보 누수는 차단했습니다.
+* 모델 1 — Linear Regression (Baseline) 
+  * LinearRegression 모델을 사용했습니다.
+  * 입력: 과거 14일 state 벡터
+  * 출력: 7일 후 Δstate
+  * 평가 지표
+     * MAE
+     * RMSE
+  * train / validation 모두에서 성능을 계산했습니다.
+     * validation 샘플 일부에 대해 아래를 출력해 sanity check를 수행했습니다.
+     * 실제 Δstate
+     * 예측 Δstate
+     * user_id
+* 모델 2 — LSTM (얕은 구조)
+  * LSTM 입력 형태로 reshape
+  * (N, lookback, 1)
+  * 모델 구조
+     * LSTM(16)
+     * Dense(1)
+     * epochs = 15, batch_size = 32
+     * loss: mse
+  * Linear 모델과 동일한 방식으로 train / validation 성능을 평가하고 validation 샘플 일부에 대해 예측 결과를 비교 출력했습니다.
+  * Core 2 요약 출력 
+     * LOOKBACK, HORIZON 설정값을 출력하고 Linear vs LSTM을 정량 비교만 수행했습니다.
+     * 모델 선택·확장은 Core 3에서 MLflow 기반으로 진행하기로 고정했습니다.
+  * 예측 결과 테이블 구성하하고 validation 구간 기준으로 결과를 정리했습니다.
+  * 공통 컬럼
+     * user_id
+     * date (target_date)
+     * y_true
+     * y_pred
+     * abs_error
+     * run_tag = core2_baseline
+  * 모델 구분
+     * mode_type = linear
+     * mode_type = lstm
+  * Linear / LSTM 결과를 하나의 DataFrame으로 병합했습니다.
+  * MySQL 예측 결과 적재
+     * sqlalchemy, pymysql을 사용해 DB 연결을 구성했습니다.
+     * DB
+     * HEALTH
+     * 테이블
+     * prediction_results
+     * if_exists="append" 옵션으로 결과를 누적 저장했습니다.
+  * Core 2 baseline 예측 결과 저장 완료를 확인했습니다.
