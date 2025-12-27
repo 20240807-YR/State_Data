@@ -316,8 +316,6 @@ health_state_index(t+h) - health_state_index(t)
   * ev_battery_synth.csv를 로드 후 battery_id, charge_cycles 기준으로 정렬하고 t_index=charge_cycles로 직접 사용했다.
   * state_value=capacity_kWh로 매핑했으며 결과 포맷을 asset_id, t_index, state_value로 통일했다.
 
-⸻
-
 #### 12_25_stage_check.ipynb
 
 * Stage A — nasa_core.csv 생성
@@ -339,8 +337,6 @@ health_state_index(t+h) - health_state_index(t)
   * asset_id=str(battery_id), t_index=charge_cycles, state_value=capacity_kWh로 ev_core를 생성했다.
   * ../data_csv/ev_synth_core.csv로 저장했다.
 
-⸻
-
 #### 12_25_컬럼확인.ipynb
 * CSV 점검 유틸 inspect_csv()를 정의한 후 파일별로 columns, head, null count, row count를 출력했다.
 * 점검 대상 파일을 다음으로 고정했다.
@@ -350,8 +346,6 @@ health_state_index(t+h) - health_state_index(t)
   * ev_battery_synth.csv
   * health_timeseries_core_state.csv
 * 목적을 Stage 정규화에서 실제 사용 가능한 컬럼 구조를 사전에 확정하는 것으로 두었다.
-
-⸻
 
 #### 12_25_공통supervised생성기.ipynb
 
@@ -447,8 +441,6 @@ health_state_index(t+h) - health_state_index(t)
   * join key는 모두 asset_id,t_index로 고정했다.
   * df_core4를 ../core4_output/core4_state_prediction_action_log.csv로 저장한 후 확인용으로 상위 20행을 출력했다.
 
-⸻
-
 #### 12_26_Mysql.ipynb
 
 * 목적 및 역할
@@ -465,8 +457,6 @@ health_state_index(t+h) - health_state_index(t)
 * 보험 의사결정 규칙 및 action_log 적재
   * decide_insurance_action(error_std) 규칙을 동일하게 정의하고 insert_action_log_from_prediction(csv_path)로 예측 CSV를 읽어 액션 레코드를 생성했다.
   * 생성한 액션 레코드를 insurance_action_log에 append 적재했다.
-
-⸻
 
 #### 12_26_mysqlerror.ipynb
 
@@ -648,8 +638,6 @@ health_state_index(t+h) - health_state_index(t)
   * “Same prediction / Same thresholds / Same rule count” 조건을 유지한 채 decision input structure만 바뀌었다는 결론 문장을 노트북 내에 고정했다.
   * 결과 해석은 “구조 변경만으로 stability가 개선되었다”로 정리했다.
 
-⸻
-
 #### 12_26_State_vs_Prediction_Decision.ipynb
 * 역할
   * Case A(예측 기반)와 Case B(μHSM 기반)를 동일 평가 함수로 재평가하고, false intervention 및 토글 빈도까지 포함해 구조 차이를 수치로 비교했다.
@@ -690,3 +678,54 @@ health_state_index(t+h) - health_state_index(t)
      * False_intervention_rate
      * Intervention_toggle_rate
   * Case A와 Case B를 한 테이블에서 비교 가능하게 만들었다.
+
+⸻
+
+### 📅 12월 26일: Core 8 — Structural Reinterpretation · 규칙 실패의 구조적 원인 해석 · μHSM 안정성의 필연성 설명
+* 공통 작업 목표
+  * Core 3–7에서 이미 관측된 결과를 바탕으로, 규칙 기반 의사결정이 왜 구조적으로 불안정할 수밖에 없는지와 μHSM 기반 의사결정이 왜 동일 조건에서도 안정될 수밖에 없었는지를 해석 단계에서 고정했다.
+  * 새로운 실험, 새로운 지표, 새로운 규칙을 의도적으로 추가하지 않고, 결과가 “그렇게 나올 수밖에 없었던 이유”만을 구조적으로 설명했다.
+
+#### 12_26_structural_interpretation.md
+* 역할
+  * Core 7에서 확인된 “동일 예측 · 동일 규칙 수 · 동일 threshold” 조건 하의 결과 차이를 모델 성능이나 파라미터 문제가 아닌 의사결정 구조 차원 문제로 재해석했다.
+  * Core 8은 실험 단계가 아니라 구조 해석 단계임을 명확히 했다.
+  * Core 8에서 의도적으로 하지 않은 것
+     * 새로운 성능 지표 추가하지 않았다.
+     * 규칙 개수 증가 또는 조건 수정하지 않았다.
+     * 예측 모델 변경하지 않았다.
+     * 추가 실험 설계하지 않았다.
+* 핵심 질문 고정
+  * 왜 동일한 예측 결과와 동일한 규칙 수를 사용했음에도 예측 기반 의사결정은 흔들리고,상태 기반(μHSM) 의사결정은 안정되었는가?
+* 기존 규칙 기반 의사결정의 암묵적 전제 정리
+  * 미래 사건은 예측 가능하며 예측값이 임계값을 넘으면 개입하면 된다고 가정했다.
+  * 규칙을 정교하게 만들면 판단은 안정될 것이라 가정했다.
+* Core 3–7 결과를 통한 전제 붕괴 해석
+  * 보험 의사결정은 사건(event)을 맞히는 문제가 아니라 상태(state)를 관리하는 문제임이 드러났다고 해석했다.
+  * 사건 예측은 상태 관리의 필요 조건일 수는 있으나 충분 조건은 아니었다고 결론지었다.
+* 구조적 불안정의 원인 분석
+  * 예측은 본질적으로 단일 시점의 점(point) 값이라고 규정하고 규칙은 이 점을 임계값으로 절단하는 방식으로만 작동한다고 정리했다.
+  * 이 구조 때문에 작은 노이즈에도 판단이 뒤집히고 개입 토글(toggle)이 증가한다고 설명했다.
+  * 규칙은 “지금 나쁜가”만 판단하며 회복 중인지, 일시적 하락인지 구분하지 못한다고 해석하고 그 결과 false intervention이 구조적으로 발생할 수밖에 없다고 정리했다.
+* μHSM 구조 재정의
+  * μHSM을 단일 예측값이 아닌 상태 벡터로 정의했다.
+     * HSI: 상태 수준
+     * HDR: 변화 방향과 속도
+     * RM: 회복 맥락
+     * OBS: 관측 신뢰도
+  * μHSM은 상태의 위치, 방향, 맥락, 신뢰도를 동시에 담는 최소 상태 계측 단위라고 규정했다.
+* μHSM 기반 의사결정의 구조적 차이
+  * μHSM 기반 판단은 임계값 판단을 즉시 수행하지 않는 구조라고 설명했으며 HDR이 나쁘더라도 RM이 높거나 OBS가 낮으면 판단을 보류하도록 설계되었다고 해석했다.
+  * 이 구조적 지연이 false intervention 감소와 toggle rate 감소로 이어졌다고 연결했다.
+* 조건 불변성 재강조
+  * 규칙 개수는 변하지 않았으며 threshold 개수와 값도 변하지 않았다고 명시했다.
+  * 예측 결과 역시 변하지 않았다고 명시한 후 오직 규칙이 바라보는 입력의 차원만 달라졌다고 결론지었다.
+* 도메인 비유 및 보험 재정의 연결
+  * 배터리 관리에서 전압 하나로 제어하지 않고 SOH, 열화율, 온도 맥락을 함께 본다는 점을 비유로 사용했다.
+  * 보험 의사결정 역시 예측 확률 하나로는 충분하지 않았다고 정리하고 μHSM을 보험에서의 SOH에 해당하는 최소 상태 계측 단위로 정의했다.
+* Core 8 결론 고정
+  * 규칙 기반 의사결정이 실패한 이유는 규칙이 단순해서가 아니라 규칙이 상태를 보지 못했기 때문이라고 명확히 결론지었다.
+  * 문제는 예측이 아니라 무엇을 보고 판단해야 하는지를 몰랐던 구조적 무지였다고 정리했다.
+* Core 9 연결
+  * 보험을 사건 보상(event-driven) 시스템이 아니라 상태 관리(state-managed) 시스템으로 재정의해야 한다는 질문을 던졌다.
+  * 이를 Core 9 — From Event-driven Insurance to State-managed Insurance로 연결했다.
