@@ -484,3 +484,70 @@ health_state_index(t+h) - health_state_index(t)
 
 * insurance_action_log 중복 정리
   * 동일한 방식으로 asset_id,t_index,action 기준 dedup을 수행하고 TRUNCATE → 재적재 순서로 정리했다.
+
+⸻
+
+### 📅 12월 26일: Core 5 — 상태 기반 보험 개입 규칙 실험 및 안정화 효과 검증
+* 공통 작업 목표
+  * 건강 상태 시계열 데이터를 기반으로 상태 변화율(열화율)을 정의했다.
+  * 외부 위험 요인(risk group)을 결합해 rule-based 개입 규칙을 설계하고 개입 이후 상태가 실제로 안정화되었는지를 시간 지연 기준으로 검증했다.
+  * Core5 단계에서 사용할 의사결정 로그(core5_decision_log.csv)를 생성했다.
+
+#### 12_26_coremain.ipynb
+* 건강 상태 데이터 로드 및 정규화
+  * health_timeseries_core_state.csv를 로드한 후 user_id → asset_id, health_state_index → state_value로 컬럼을 정규화했다.
+  * asset_id, date 기준으로 정렬하고 asset별 누적 순서를 기준으로 t_index = cumcount()를 생성했다.
+
+* 상태 변화량 및 열화율(degradation_rate) 계산
+  * asset별 state_value 차분으로 delta_state를 계산하고 delta_state에 대해 7일 이동평균(window=7, min_periods=3)을 적용해 degradation_rate를 정의했다.
+  * 이는 단일 시점 변화가 아닌 추세 기반 상태 악화 속도를 의미하도록 설계했다.
+
+* 외부 위험도(risk_group) 구성
+  * diabetes_dataset.csv를 로드하고 Glucose, BMI, Age, BloodPressure의 평균으로 risk_score를 계산했다.
+  * risk_score를 3분위로 나눠 low / mid / high risk group을 생성하였으며 health 데이터의 asset 수에 맞춰 risk group을 랜덤 샘플링해 매핑했다.
+  * 이는 실제 환자 매칭이 아닌 구조 실험용 위험도 주입이었다.
+
+* 1차 개입 여부(intervention_flag) 규칙 정의
+  * 다음 rule-based 개입 규칙을 정의했다.
+     * risk_group == high 이고 degradation_rate < -0.05 → 개입
+     * risk_group == mid 이고 degradation_rate < -0.10 → 개입
+  * 그 외는 미개입
+  * row 단위로 규칙을 적용해 intervention_flag (0/1)를 생성했다.
+
+* 개입 이후 안정화(stabilized) 판단
+  * compute_stabilization(df, window=7) 함수를 정의하고 현재 시점 대비 window 이후의 state_value를 post_state로 정의했다.
+  * post_state - state_value > 0이면 상태가 안정화된 것으로 판단하고 기본 window=7 기준으로 안정화율을 계산했다.
+  * intervention_flag별 안정화 비율을 비교했다.
+
+* 개입 강도별 규칙 재정의 실험
+  * 개입 강도를 "strong" / "weak" / "none"으로 확장했다.
+     * high + 강한 열화 → strong
+     * high/mid + 완만한 열화 → weak
+  * 그 외 → none
+  * 동일한 안정화 지표를 기준으로 개입 강도별 효과를 비교했다.
+
+* 시간 지연(window) 효과 분석
+  * 안정화 판단 window를 [3, 7, 14]로 바꿔가며 반복 실험한 후 window 변화에 따라 개입 효과가 어떻게 달라지는지 출력으로 확인했다.
+  * 단기/중기/장기 지연 효과를 비교하기 위한 구조였다.
+
+* 개입 효율(Efficiency) 지표 정의
+  * stabilize_rate = stabilized.mean()
+  * count = 표본 수
+  * efficiency = stabilize_rate / count로 정의했다.
+  * 이는 단순 성공률이 아니라 개입 빈도 대비 효과 밀도를 보려는 목적이었다.
+
+* False Intervention(개입 실패) 분석
+  * intervention_flag == 1 이지만 stabilized == False인 샘플을 추출 후 해당 샘플의 risk_group, degradation_rate 분포를 기술통계로 확인했다.
+  * 이는 과잉 개입 / 잘못된 개입 조건 탐색을 위한 분석이었다.
+
+* Core5 의사결정 로그 생성
+  * 다음 컬럼만 추려 core5_log를 구성했다.
+     * asset_id
+     * date
+     * t_index
+     * state_value
+     * degradation_rate
+     * risk_group
+     * intervention_flag
+     * stabilized
+  * 이를 core5_decision_log.csv로 저장하였으며 Core5 통합 실험 및 상위 제어 로직 입력용 로그로 사용된다.
