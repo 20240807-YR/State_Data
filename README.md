@@ -618,3 +618,75 @@ health_state_index(t+h) - health_state_index(t)
      * stabilized
   * ../data_csv/core5_decision_log.csv로 저장했다.
   * 이 로그를 Core7 제어·보상·정책 단계의 입력 데이터로 사용하도록 확정했다.
+
+⸻
+
+### 📅 12월 26일: Core 7 — Decision Re-validation · 동일 예측 유지 · 의사결정 입력 구조만 변경 · MLflow/UI 레벨로 결과 고정
+* 공통 작업 목표
+  * 같은 예측 결과(또는 동일 기준의 Δstate/추세)를 쓰더라도 의사결정 입력 구조(decision input structure) 를 바꾸면 결과가 달라진다는 사실을 UI(MLflow run 비교) 레벨에서 고정했다.
+  * threshold를 새로 늘리거나 규칙 개수를 늘리지 않고 입력 변수 구조만 변경해 안정화(stability) 개선이 발생하는지 재검증했다.
+
+#### 12_26_core7_decision_revalidation_mlflow.ipynb
+* 역할
+  * Core6에서 생성된 로그(core5_decision_log.csv)를 읽어 Case A / Case B 결과를 MLflow에 고정 로깅했다.
+  * UI에서 “같은 예측(동일 기준)인데 decision 구조만 바꿨다”는 비교가 가능하도록 run을 분리했다.
+* MLflow 연결
+  * tracking uri를 sqlite:////Users/mac/Desktop/HW/State_Data/mlflow.db로 설정했다.
+  * experiment를 core7_decision_revalidation로 고정했다.
+* 입력 데이터 로드
+  * ../data_csv/core5_decision_log.csv를 로드했다.
+  * 핵심 컬럼을 asset_id, degradation_rate, risk_group, intervention_flag, stabilized 기준으로 사용했다.
+* Case A 로깅 (Prediction-based)
+  * run_name을 CaseA_prediction_based로 설정하고 param을 decision_type=prediction_only, input=HDR + risk_group로 기록했다.
+  * metric을 다음 방식으로 계산해 로깅했다.
+     * stabilization_rate는 intervention_flag==1인 샘플의 stabilized.mean()으로 계산했다.
+     * false_intervention_rate는 (intervention_flag==1 & stabilized==False)의 평균값으로 계산해 로깅했다.
+* Case B 로깅 (μHSM-based)
+  * run_name을 CaseB_muHSM_based로 설정하고 param을 decision_type=state_based, input=HSI + HDR + RM + OBS로 기록했다.
+  * metric 계산은 Case A와 동일한 방식으로 수행해 stabilization_rate, false_intervention_rate를 로깅했다.
+* Core 7 메시지 고정
+  * “Same prediction / Same thresholds / Same rule count” 조건을 유지한 채 decision input structure만 바뀌었다는 결론 문장을 노트북 내에 고정했다.
+  * 결과 해석은 “구조 변경만으로 stability가 개선되었다”로 정리했다.
+
+⸻
+
+#### 12_26_State_vs_Prediction_Decision.ipynb
+* 역할
+  * Case A(예측 기반)와 Case B(μHSM 기반)를 동일 평가 함수로 재평가하고, false intervention 및 토글 빈도까지 포함해 구조 차이를 수치로 비교했다.
+  * “규칙 개수 동일 / threshold 증설 없음” 조건을 코드 수준에서 유지했다.
+* 데이터 로드 및 컬럼 확인
+  * Case A로 ../data_csv/core5_decision_log.csv를 로드했다.
+  * Case B로 ../data_csv/muHSM_state_monitor.csv를 로드했다.
+  * 두 데이터프레임의 컬럼 목록을 출력해 비교 기준을 고정했다.
+* Case A 구성 (Prediction-based)
+  * 입력 구조를 degradation_rate + risk_group로 정의하고 상태 맥락 변수를 쓰지 않는 구조로 고정했다.
+  * asset_id, t_index 기준 정렬 후 평가 대상으로 사용했다.
+* Case B 구성 (μHSM-based)
+  * 입력 구조를 HSI + HDR + RM + OBS로 정의하고 HDR → degradation_rate로 컬럼을 통일했다.
+  * asset_id, date 기준 정렬 후 평가 대상으로 사용했다.
+* Case B 개입 규칙 정의 (규칙 수 동일 조건 유지)
+  * 새 규칙을 다음 조건 1개로 고정했다.
+     * degradation_rate < -0.05 AND recovery_margin < 0.3 AND observability_score > 0.6이면 개입(1)으로 판정했다.
+  * 규칙 개수를 늘리지 않는 조건을 유지했다.
+* 안정화 계산 함수 공통화
+  * compute_stabilization(df, state_col, group_col, window=7)를 공통 함수로 정의했다.
+  * post_state = group별 shift(-window)로 정의하고 post_state - current_state > 0이면 stabilized로 판정했다.
+* Case A 안정화 평가
+  * state_col="state_value"로 안정화를 계산했다.
+  * intervention_flag별 stabilized.mean()을 출력해 개입 효과를 확인했다.
+* Case B 안정화 평가
+  * state_col="HSI"로 안정화를 계산했다.
+  * intervention_flag별 stabilized.mean()을 출력해 개입 효과를 확인했다.
+* False intervention 비교
+  * Case A는 (intervention_flag==1 & stabilized==False)를 false_A로 정의했다.
+  * Case B는 동일 기준으로 false_B를 정의했다.
+  * false intervention rate를 “false 개수 / (개입 개수)”로 계산해 두 케이스를 비교 출력했다.
+* 개입 토글 빈도(안정성) 비교
+  * intervention_toggle_rate()를 정의해 asset별 flag 변화 횟수를 계산했다.
+  * toggles / len(flags)의 평균으로 toggle rate를 정의하고 Case A와 Case B toggle rate를 비교 출력했다.
+* Core 7 요약 테이블 생성
+  * summary 테이블을 생성 후 포함 지표를 다음 3개로 고정했다.
+     * Stabilization_when_intervened
+     * False_intervention_rate
+     * Intervention_toggle_rate
+  * Case A와 Case B를 한 테이블에서 비교 가능하게 만들었다.
