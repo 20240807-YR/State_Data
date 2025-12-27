@@ -237,7 +237,7 @@
   * y: (N,)
   * meta: `user_id`, `t_date`, `target_date`
 * `Time-based Train / Validation` 분리하여 `target_date` 기준으로 전체 샘플을 시간 순 정렬했습니다.
-* 앞 80%를 train, 뒤 20%를 validation으로 분리한 후 사용자 섞임은 허용하되 미래 정보 누수는 차단했습니다.
+* 앞 80%를 `train`, 뒤 20%를 `validation`으로 분리한 후 사용자 섞임은 허용하되 미래 정보 누수는 차단했습니다.
 * 모델 1 — Linear Regression (Baseline) 
   * LinearRegression 모델을 사용했습니다.
   * 입력: 과거 14일 state 벡터
@@ -246,7 +246,7 @@
      * MAE
      * RMSE
   * train / validation 모두에서 성능을 계산했습니다.
-     * validation 샘플 일부에 대해 아래를 출력해 sanity check를 수행했습니다.
+     * validation 샘플 일부에 대해 아래를 출력해 `sanity check`를 수행했습니다.
      * 실제 Δstate
      * 예측 Δstate
      * user_id
@@ -287,11 +287,11 @@
 
 * 공통 작업 목표
   * 출처가 다른 열화 데이터(NASA / liBattery / Synthetic / EV)를 동일한 상태 시계열 구조로 통일했다.
-  * 학습 타깃을 절대 상태값이 아니라 Δstate = state(t+horizon) - state(t)로 고정했다.
+  * 학습 타깃을 절대 상태값이 아니라 `Δstate = state(t+horizon) - state(t)`로 고정했다.
   * 이후 Core 4·5에서 제어, 불확실성, 이식 가능성 비교가 가능하도록 데이터와 실험 구조를 정리했다.
 
 * 공통 데이터 포맷
-  * 모든 Stage 결과를 asset_id, t_index, state_value 3컬럼으로 통일했다.
+  * 모든 Stage 결과를 `asset_id`, `t_index`, `state_value` 3컬럼으로 통일했다.
 
 #### 12_25_공통포맷정규화.ipynb
 
@@ -454,7 +454,7 @@
 
 * 보험 의사결정 규칙 및 action_log 적재
   * `decide_insurance_action(error_std)` 규칙을 동일하게 정의하고 insert_action_log_from_prediction(csv_path)로 예측 CSV를 읽어 액션 레코드를 생성했다.
-  * 생성한 액션 레코드를 insurance_action_log에 append 적재했다.
+  * 생성한 액션 레코드를 `insurance_action_log`에 `append` 적재했다.
 
 #### 12_26_mysqlerror.ipynb
 
@@ -478,39 +478,39 @@
 ### 📅 12월 26일: Core 5 — 상태 기반 보험 개입 규칙 실험 및 안정화 효과 검증
 * 공통 작업 목표
   * 건강 상태 시계열 데이터를 기반으로 상태 변화율(열화율)을 정의했다.
-  * 외부 위험 요인(risk group)을 결합해 rule-based 개입 규칙을 설계하고 개입 이후 상태가 실제로 안정화되었는지를 시간 지연 기준으로 검증했다.
+  * 외부 위험 요인(`risk group`)을 결합해 `rule-based` 개입 규칙을 설계하고 개입 이후 상태가 실제로 안정화되었는지를 시간 지연 기준으로 검증했다.
   * Core5 단계에서 사용할 의사결정 로그(core5_decision_log.csv)를 생성했다.
 
 #### 12_26_coremain.ipynb
 * 건강 상태 데이터 로드 및 정규화
-  * health_timeseries_core_state.csv를 로드한 후 user_id → asset_id, health_state_index → state_value로 컬럼을 정규화했다.
+  * health_timeseries_core_state.csv를 로드한 후 `user_id → asset_id`, `health_state_index → state_value`로 컬럼을 정규화했다.
   * asset_id, date 기준으로 정렬하고 asset별 누적 순서를 기준으로 t_index = cumcount()를 생성했다.
 
 * 상태 변화량 및 열화율(degradation_rate) 계산
-  * asset별 state_value 차분으로 delta_state를 계산하고 delta_state에 대해 7일 이동평균(window=7, min_periods=3)을 적용해 degradation_rate를 정의했다.
+  * `asset`별 `state_value` 차분으로 `delta_state`를 계산하고 `delta_state`에 대해 7일 이동평균(`window=7`, `min_periods=3`)을 적용해 `degradation_rate`를 정의했다.
   * 이는 단일 시점 변화가 아닌 추세 기반 상태 악화 속도를 의미하도록 설계했다.
 
 * 외부 위험도(risk_group) 구성
-  * diabetes_dataset.csv를 로드하고 Glucose, BMI, Age, BloodPressure의 평균으로 risk_score를 계산했다.
-  * risk_score를 3분위로 나눠 low / mid / high risk group을 생성하였으며 health 데이터의 asset 수에 맞춰 risk group을 랜덤 샘플링해 매핑했다.
+  * diabetes_dataset.csv를 로드하고 `Glucose`, `BMI`, `Age`, `BloodPressure`의 평균으로 `risk_score`를 계산했다.
+  * `risk_score`를 3분위로 나눠 `low / mid / high risk group`을 생성하였으며 `health` 데이터의 `asset` 수에 맞춰 `risk group`을 랜덤 샘플링해 매핑했다.
   * 이는 실제 환자 매칭이 아닌 구조 실험용 위험도 주입이었다.
 
 * 1차 개입 여부(intervention_flag) 규칙 정의
-  * 다음 rule-based 개입 규칙을 정의했다.
-     * risk_group == high 이고 degradation_rate < -0.05 → 개입
-     * risk_group == mid 이고 degradation_rate < -0.10 → 개입
+  * 다음 `rule-based` 개입 규칙을 정의했다.
+     *` risk_group == high` 이고 `degradation_rate < -0.05` → 개입
+     * `risk_group == mid` 이고 `degradation_rate < -0.10` → 개입
   * 그 외는 미개입
-  * row 단위로 규칙을 적용해 intervention_flag (0/1)를 생성했다.
+  * row 단위로 규칙을 적용해 `intervention_flag (0/1)`를 생성했다.
 
 * 개입 이후 안정화(stabilized) 판단
-  * compute_stabilization(df, window=7) 함수를 정의하고 현재 시점 대비 window 이후의 state_value를 post_state로 정의했다.
-  * post_state - state_value > 0이면 상태가 안정화된 것으로 판단하고 기본 window=7 기준으로 안정화율을 계산했다.
-  * intervention_flag별 안정화 비율을 비교했다.
+  * `compute_stabilization(df, window=7)` 함수를 정의하고 현재 시점 대비 window 이후의 `state_value`를 `post_state`로 정의했다.
+  * `post_state - state_value > 0`이면 상태가 안정화된 것으로 판단하고 기본 `window=7` 기준으로 안정화율을 계산했다.
+  * `intervention_flag`별 안정화 비율을 비교했다.
 
 * 개입 강도별 규칙 재정의 실험
-  * 개입 강도를 "strong" / "weak" / "none"으로 확장했다.
-     * high + 강한 열화 → strong
-     * high/mid + 완만한 열화 → weak
+  * 개입 강도를 `"strong" / "weak" / "none"`으로 확장했다.
+     * high + 강한 열화 → `strong`
+     * high/mid + 완만한 열화 → `weak`
   * 그 외 → none
   * 동일한 안정화 지표를 기준으로 개입 강도별 효과를 비교했다.
 
@@ -519,13 +519,13 @@
   * 단기/중기/장기 지연 효과를 비교하기 위한 구조였다.
 
 * 개입 효율(Efficiency) 지표 정의
-  * stabilize_rate = stabilized.mean()
-  * count = 표본 수
-  * efficiency = stabilize_rate / count로 정의했다.
+  * `stabilize_rate = stabilized.mean()`
+  * `count` = 표본 수
+  * `efficiency` = `stabilize_rate / count`로 정의했다.
   * 이는 단순 성공률이 아니라 개입 빈도 대비 효과 밀도를 보려는 목적이었다.
 
 * False Intervention(개입 실패) 분석
-  * intervention_flag == 1 이지만 stabilized == False인 샘플을 추출 후 해당 샘플의 risk_group, degradation_rate 분포를 기술통계로 확인했다.
+  * `intervention_flag == 1` 이지만 `stabilized == False`인 샘플을 추출 후 해당 샘플의 `risk_group`, `degradation_rate` 분포를 기술통계로 확인했다.
   * 이는 과잉 개입 / 잘못된 개입 조건 탐색을 위한 분석이었다.
 
 * Core5 의사결정 로그 생성
@@ -548,50 +548,50 @@
 
 * 공통 목적
   * 개인 건강 데이터를 사건(event) 이 아니라 연속 상태(state) 로 해석했다.
-  * 상태 수준(state_value)과 상태 추세(degradation_rate)를 분리해 μHSM(State Monitor) 를 구성했다.
+  * 상태 수준(`state_value`)과 상태 추세(`degradation_rate`)를 분리해 μHSM(`State Monitor`) 를 구성했다.
   * 위험군(risk_group)과 상태 추세를 결합한 rule-based 개입이 실제 안정화로 이어지는지 검증 후 Core7 제어/보상 단계에 입력할 의사결정 로그를 생성했다.
 
 * 상태 데이터 로드 및 정규화
-  * health_timeseries_core_state.csv를 로드하고 user_id → asset_id, health_state_index → state_value로 컬럼을 정규화했다.
-  * asset_id, date 기준으로 정렬한 뒤 cumcount()로 날짜 기반 t_index를 생성했다.
-* 상태 변화량 및 추세(degradation_rate) 계산
-  * asset별 state_value.diff()로 delta_state를 계산한 후 delta_state에 rolling(window=7, min_periods=3) 평균을 적용해 단기 열화 추세인 degradation_rate를 계산했다.
+  * health_timeseries_core_state.csv를 로드하고 `user_id → asset_id`, `health_state_index → state_value`로 컬럼을 정규화했다.
+  * `asset_id`, `date` 기준으로 정렬한 뒤 `cumcount()`로 날짜 기반 `t_index`를 생성했다.
+* 상태 변화량 및 추세(`degradation_rate`) 계산
+  * `asset`별 `state_value.diff()`로 `delta_state`를 계산한 후 `delta_state`에 `rolling(window=7, min_periods=3)` 평균을 적용해 단기 열화 추세인 `degradation_rate`를 계산했다.
   * 이를 통해 순간 노이즈가 아닌 추세 기반 상태 악화만을 포착했다.
 
 * 외부 위험군(risk_group) 생성 및 매핑
-  * diabetes_dataset.csv를 로드하고 Glucose, BMI, Age, BloodPressure 평균으로 risk_score를 계산했다.
-  * risk_score를 3분위로 나눠 low / mid / high 위험군을 생성했으며 health asset 수만큼 위험군을 샘플링해 asset_id에 매핑했다.
+  * diabetes_dataset.csv를 로드하고 `Glucose`, `BMI`, `Age`, `BloodPressure` 평균으로 `risk_score`를 계산했다.
+  * `risk_score`를 3분위로 나눠 `low / mid / high` 위험군을 생성했으며 `health asset` 수만큼 위험군을 샘플링해 `asset_id`에 매핑했다.
   * 이 단계는 의료 위험 컨텍스트를 상태 모니터에 결합하는 구조 실험이었다.
 
 * 1차 개입 규칙(intervention_flag) 정의
-  * 다음 rule-based 조건으로 개입 여부를 정의했다.
-     * high 위험군 & degradation_rate < -0.05 → 개입
-     * mid 위험군 & degradation_rate < -0.10 → 개입
+  * 다음 `rule-based` 조건으로 개입 여부를 정의했다.
+     * `high 위험군 & degradation_rate < -0.05` → 개입
+     * `mid 위험군 & degradation_rate < -0.10` → 개입
   * 그 외 → 비개입
-  * 이를 intervention_flag (0/1)로 생성했다.
+  * 이를 `intervention_flag (0/1)`로 생성했다.
 
 * 안정화(stabilization) 판정 로직
-  * compute_stabilization(df, window) 함수를 정의하고 개입 시점 기준 window 이후의 post_state를 계산했다.
-  * post_state - state_value > 0이면 안정화(stabilized=True)로 판정했으며 기본 window=7 기준으로 안정화 비율을 계산했다.
+  * `compute_stabilization(df, window)` 함수를 정의하고 개입 시점 기준 `window` 이후의 `post_state`를 계산했다.
+  * `post_state - state_value > 0`이면 안정화(`stabilized=True`)로 판정했으며 기본 `window=7` 기준으로 안정화 비율을 계산했다.
 
 * 개입 강도 재정의 실험
   * 개입을 이진 플래그가 아닌 강도로 재정의했다.
-     * high & degradation_rate < -0.1 → "strong"
-     * high or mid & degradation_rate < -0.05 → "weak"
+     * `high & degradation_rate < -0.1` → "strong"
+     * `high or mid & degradation_rate < -0.05` → "weak"
   * 그 외 → "none"
   * 개입 강도별 안정화 비율을 비교했다.
 
 * 시간 지연(window) 효과 분석
-  * window를 [3, 7, 14]로 변경하며 안정화 비율을 비교하고 개입 효과가 즉시 반응이 아닌 시간 누적 효과임을 확인했다.
+  * `window`를 `[3, 7, 14]`로 변경하며 안정화 비율을 비교하고 개입 효과가 즉시 반응이 아닌 시간 누적 효과임을 확인했다.
 
 * 개입 효율(Efficiency) 지표 계산
-  * intervention_flag 기준으로 다음을 집계했다.
-     * stabilize_rate = 안정화 비율
-     * count = 샘플 수
-  * efficiency = stabilize_rate / count로 개입 효율 지표를 계산 후 개입 빈도와 효율이 항상 비례하지 않음을 확인했다.
+  * `intervention_flag` 기준으로 다음을 집계했다.
+     * `stabilize_rate` = 안정화 비율
+     * `count` = 샘플 수
+  * `efficiency = stabilize_rate / count`로 개입 효율 지표를 계산 후 개입 빈도와 효율이 항상 비례하지 않음을 확인했다.
 
 * False Intervention 분석
-  * intervention_flag == 1 이면서 stabilized == False 인 사례를 추출했으며 해당 샘플의 risk_group, degradation_rate 분포 통계를 확인했다.
+  * `intervention_flag == 1` 이면서 `stabilized == False` 인 사례를 추출했으며 해당 샘플의 `risk_group`, `degradation_rate` 분포 통계를 확인했다.
   * 개입 실패 영역을 명시적으로 분리했다.
 
 * Core7 입력 로그 생성
@@ -611,65 +611,65 @@
 
 ### 📅 12월 26일: Core 7 — Decision Re-validation · 동일 예측 유지 · 의사결정 입력 구조만 변경 · MLflow/UI 레벨로 결과 고정
 * 공통 작업 목표
-  * 같은 예측 결과(또는 동일 기준의 Δstate/추세)를 쓰더라도 의사결정 입력 구조(decision input structure) 를 바꾸면 결과가 달라진다는 사실을 UI(MLflow run 비교) 레벨에서 고정했다.
-  * threshold를 새로 늘리거나 규칙 개수를 늘리지 않고 입력 변수 구조만 변경해 안정화(stability) 개선이 발생하는지 재검증했다.
+  * 같은 예측 결과 또는 동일 기준의 `Δstate/추세`를 쓰더라도 의사결정 입력 구조`decision input structure` 를 바꾸면 결과가 달라진다는 사실을 UI(MLflow run 비교) 레벨에서 고정했다.
+  * `threshold`를 새로 늘리거나 규칙 개수를 늘리지 않고 입력 변수 구조만 변경해 안정화(`stability`) 개선이 발생하는지 재검증했다.
 
 #### 12_26_core7_decision_revalidation_mlflow.ipynb
 * 역할
   * Core6에서 생성된 로그(core5_decision_log.csv)를 읽어 Case A / Case B 결과를 MLflow에 고정 로깅했다.
   * UI에서 “같은 예측(동일 기준)인데 decision 구조만 바꿨다”는 비교가 가능하도록 run을 분리했다.
 * MLflow 연결
-  * tracking uri를 sqlite:////Users/mac/Desktop/HW/State_Data/mlflow.db로 설정했다.
-  * experiment를 core7_decision_revalidation로 고정했다.
+  * `tracking uri`를 sqlite:////Users/mac/Desktop/HW/State_Data/mlflow.db로 설정했다.
+  * experiment를 `core7_decision_revalidation`로 고정했다.
 * 입력 데이터 로드
   * ../data_csv/core5_decision_log.csv를 로드했다.
-  * 핵심 컬럼을 asset_id, degradation_rate, risk_group, intervention_flag, stabilized 기준으로 사용했다.
+  * 핵심 컬럼을 `asset_id`, `degradation_rate`, `risk_group`, `intervention_flag`, `stabilized` 기준으로 사용했다.
 * Case A 로깅 (Prediction-based)
-  * run_name을 CaseA_prediction_based로 설정하고 param을 decision_type=prediction_only, input=HDR + risk_group로 기록했다.
+  * `run_name`을 `CaseA_prediction_based`로 설정하고 param을 `decision_type=prediction_only`, `input=HDR + risk_group`로 기록했다.
   * metric을 다음 방식으로 계산해 로깅했다.
-     * stabilization_rate는 intervention_flag==1인 샘플의 stabilized.mean()으로 계산했다.
-     * false_intervention_rate는 (intervention_flag==1 & stabilized==False)의 평균값으로 계산해 로깅했다.
+     * `stabilization_rate`는 `intervention_flag==1`인 샘플의 `stabilized.mean()`으로 계산했다.
+     * `false_intervention_rate`는 `intervention_flag==1` & `stabilized==False`의 평균값으로 계산해 로깅했다.
 * Case B 로깅 (μHSM-based)
-  * run_name을 CaseB_muHSM_based로 설정하고 param을 decision_type=state_based, input=HSI + HDR + RM + OBS로 기록했다.
-  * metric 계산은 Case A와 동일한 방식으로 수행해 stabilization_rate, false_intervention_rate를 로깅했다.
+  * `run_name`을 `CaseB_muHSM_based`로 설정하고 `param`을 `decision_type=state_based`, `input=HSI + HDR + RM + OBS`로 기록했다.
+  * `metric` 계산은 Case A와 동일한 방식으로 수행해 `stabilization_rate`, `false_intervention_rate`를 로깅했다.
 * Core 7 메시지 고정
-  * “Same prediction / Same thresholds / Same rule count” 조건을 유지한 채 decision input structure만 바뀌었다는 결론 문장을 노트북 내에 고정했다.
+  * `Same prediction` / `Same thresholds` / `Same rule count` 조건을 유지한 채 `decision input structure`만 바뀌었다는 결론 문장을 노트북 내에 고정했다.
   * 결과 해석은 “구조 변경만으로 stability가 개선되었다”로 정리했다.
 
 #### 12_26_State_vs_Prediction_Decision.ipynb
 * 역할
-  * Case A(예측 기반)와 Case B(μHSM 기반)를 동일 평가 함수로 재평가하고, false intervention 및 토글 빈도까지 포함해 구조 차이를 수치로 비교했다.
-  * “규칙 개수 동일 / threshold 증설 없음” 조건을 코드 수준에서 유지했다.
+  * Case A(예측 기반)와 Case B(μHSM 기반)를 동일 평가 함수로 재평가하고, `false intervention` 및 토글 빈도까지 포함해 구조 차이를 수치로 비교했다.
+  * “규칙 개수 동일 / `threshold` 증설 없음” 조건을 코드 수준에서 유지했다.
 * 데이터 로드 및 컬럼 확인
   * Case A로 ../data_csv/core5_decision_log.csv를 로드했다.
   * Case B로 ../data_csv/muHSM_state_monitor.csv를 로드했다.
   * 두 데이터프레임의 컬럼 목록을 출력해 비교 기준을 고정했다.
 * Case A 구성 (Prediction-based)
-  * 입력 구조를 degradation_rate + risk_group로 정의하고 상태 맥락 변수를 쓰지 않는 구조로 고정했다.
-  * asset_id, t_index 기준 정렬 후 평가 대상으로 사용했다.
+  * 입력 구조를 `degradation_rate + risk_group`로 정의하고 상태 맥락 변수를 쓰지 않는 구조로 고정했다.
+  * `asset_id`, `t_index` 기준 정렬 후 평가 대상으로 사용했다.
 * Case B 구성 (μHSM-based)
-  * 입력 구조를 HSI + HDR + RM + OBS로 정의하고 HDR → degradation_rate로 컬럼을 통일했다.
-  * asset_id, date 기준 정렬 후 평가 대상으로 사용했다.
+  * 입력 구조를 `HSI + HDR + RM + OBS`로 정의하고 `HDR → degradation_rate`로 컬럼을 통일했다.
+  * `asset_id`, `date` 기준 정렬 후 평가 대상으로 사용했다.
 * Case B 개입 규칙 정의 (규칙 수 동일 조건 유지)
   * 새 규칙을 다음 조건 1개로 고정했다.
-     * degradation_rate < -0.05 AND recovery_margin < 0.3 AND observability_score > 0.6이면 개입(1)으로 판정했다.
+     * `degradation_rate < -0.05` AND `recovery_margin < 0.3` AND `observability_score > 0.6`이면 개입(1)으로 판정했다.
   * 규칙 개수를 늘리지 않는 조건을 유지했다.
 * 안정화 계산 함수 공통화
-  * compute_stabilization(df, state_col, group_col, window=7)를 공통 함수로 정의했다.
-  * post_state = group별 shift(-window)로 정의하고 post_state - current_state > 0이면 stabilized로 판정했다.
+  * `compute_stabilization(df, state_col, group_col, window=7)`를 공통 함수로 정의했다.
+  * `post_state = group별 shift(-window)`로 정의하고 `post_state - current_state > 0`이면 `stabilized`로 판정했다.
 * Case A 안정화 평가
-  * state_col="state_value"로 안정화를 계산했다.
-  * intervention_flag별 stabilized.mean()을 출력해 개입 효과를 확인했다.
+  * `state_col=state_value`로 안정화를 계산했다.
+  * `intervention_flag`별 `stabilized.mean()`을 출력해 개입 효과를 확인했다.
 * Case B 안정화 평가
-  * state_col="HSI"로 안정화를 계산했다.
-  * intervention_flag별 stabilized.mean()을 출력해 개입 효과를 확인했다.
+  * `state_col="HSI"`로 안정화를 계산했다.
+  * `intervention_flag`별 `stabilized.mean()`을 출력해 개입 효과를 확인했다.
 * False intervention 비교
-  * Case A는 (intervention_flag==1 & stabilized==False)를 false_A로 정의했다.
-  * Case B는 동일 기준으로 false_B를 정의했다.
-  * false intervention rate를 “false 개수 / (개입 개수)”로 계산해 두 케이스를 비교 출력했다.
+  * Case A는 (`intervention_flag==1 & stabilized==False`)를 `false_A`로 정의했다.
+  * Case B는 동일 기준으로 `false_B`를 정의했다.
+  * `false intervention rate`를 `“false 개수 / (개입 개수)”`로 계산해 두 케이스를 비교 출력했다.
 * 개입 토글 빈도(안정성) 비교
-  * intervention_toggle_rate()를 정의해 asset별 flag 변화 횟수를 계산했다.
-  * toggles / len(flags)의 평균으로 toggle rate를 정의하고 Case A와 Case B toggle rate를 비교 출력했다.
+  * `intervention_toggle_rate()`를 정의해 `asset별 flag 변화` 횟수를 계산했다.
+  * `toggles / len(flags)`의 평균으로 toggle rate`를 정의하고 Case A와 Case B `toggle rate`를 비교 출력했다.
 * Core 7 요약 테이블 생성
   * summary 테이블을 생성 후 포함 지표를 다음 3개로 고정했다.
      * Stabilization_when_intervened
@@ -704,7 +704,7 @@
 * 구조적 불안정의 원인 분석
   * 예측은 본질적으로 단일 시점의 점(point) 값이라고 규정하고 규칙은 이 점을 임계값으로 절단하는 방식으로만 작동한다고 정리했다.
   * 이 구조 때문에 작은 노이즈에도 판단이 뒤집히고 개입 토글(toggle)이 증가한다고 설명했다.
-  * 규칙은 “지금 나쁜가”만 판단하며 회복 중인지, 일시적 하락인지 구분하지 못한다고 해석하고 그 결과 false intervention이 구조적으로 발생할 수밖에 없다고 정리했다.
+  * 규칙은 “지금 나쁜가”만 판단하며 회복 중인지, 일시적 하락인지 구분하지 못한다고 해석하고 그 결과 `false intervention`이 구조적으로 발생할 수밖에 없다고 정리했다.
 * μHSM 구조 재정의
   * μHSM을 단일 예측값이 아닌 상태 벡터로 정의했다.
      * HSI: 상태 수준
@@ -714,9 +714,9 @@
   * μHSM은 상태의 위치, 방향, 맥락, 신뢰도를 동시에 담는 최소 상태 계측 단위라고 규정했다.
 * μHSM 기반 의사결정의 구조적 차이
   * μHSM 기반 판단은 임계값 판단을 즉시 수행하지 않는 구조라고 설명했으며 HDR이 나쁘더라도 RM이 높거나 OBS가 낮으면 판단을 보류하도록 설계되었다고 해석했다.
-  * 이 구조적 지연이 false intervention 감소와 toggle rate 감소로 이어졌다고 연결했다.
+  * 이 구조적 지연이 `false intervention` 감소와 `toggle rate` 감소로 이어졌다고 연결했다.
 * 조건 불변성 재강조
-  * 규칙 개수는 변하지 않았으며 threshold 개수와 값도 변하지 않았다고 명시했다.
+  * 규칙 개수는 변하지 않았으며 `threshold` 개수와 값도 변하지 않았다고 명시했다.
   * 예측 결과 역시 변하지 않았다고 명시한 후 오직 규칙이 바라보는 입력의 차원만 달라졌다고 결론지었다.
 * 도메인 비유 및 보험 재정의 연결
   * 배터리 관리에서 전압 하나로 제어하지 않고 SOH, 열화율, 온도 맥락을 함께 본다는 점을 비유로 사용했다.
@@ -740,7 +740,7 @@
 #### 12_26_core9B_state_based_redecision.ipynb
 * 역할
   * Core 5 decision log를 기준으로 μHSM 상태 관측 결과를 병합한 **State-based 재판단 로그(Core 9-B)**를 생성했다.
-  * Core 5와 동일한 stabilization 계산 방식을 유지했다.
+  * Core 5와 동일한 `stabilization` 계산 방식을 유지했다.
 * 입력 데이터 로드
   * ../data_csv/core5_decision_log.csv를 로드했다.
   * ../data_csv/muHSM_state_monitor.csv를 로드했다.
@@ -752,14 +752,14 @@
   * 규칙 수를 늘리지 않았다.
   * 임계값을 새로 추가하지 않았다.
   * 다음 조건 1개로 판단을 고정했다.
-     * HDR < -0.05
-     * recovery_margin < 0.3
-     * observability_score > 0.5
-  * 조건을 만족하면 intervention_flag_core9 = 1로 판정했다.
+     * `HDR < -0.05`
+     * `recovery_margin < 0.3`
+     * `observability_score > 0.5`
+  * 조건을 만족하면 `intervention_flag_core9 = 1`로 판정했다.
 * 안정화(stabilization) 계산
   * Core 5와 동일한 방식으로 계산했다.
-  * asset_id별 state_value를 window=7만큼 shift하여 post_state를 생성했다.
-  * post_state - state_value > 0이면 stabilized=True로 판정했다.
+  * `asset_id`별 `state_value`를 `window=7만큼 shift하여 post_state`를 생성했다.
+  * `post_state - state_value > 0`이면 `stabilized=True`로 판정했다.
 * Core 9-B decision log 생성
   * 다음 컬럼으로 decision log를 구성했다.
      * asset_id
@@ -780,20 +780,20 @@
 * 역할
   * Core 9-B decision log를 MySQL 테이블로 적재했다.
 * 테이블 생성
-  * core9_state_based_decision_log 테이블을 생성했다.
-  * asset_id, date, t_index를 포함한 상태 기반 판단 로그 구조로 정의했다.
+  * `core9_state_based_decision_log` 테이블을 생성했다.
+  * `asset_id`, `date`, `t_index`를 포함한 상태 기반 판단 로그 구조로 정의했다.
 * MySQL 적재
-  * core9_state_based_decision_log.csv를 append 방식으로 적재했다.
+  * core9_state_based_decision_log.csv를 `append` 방식으로 적재했다.
 * 적재 확인
   * 최근 10행을 조회해 적재 결과를 확인했다.
-  * Core 5 vs Core 9 개입 비율을 UNION ALL로 비교했다.
+  * Core 5 vs Core 9 개입 비율을 `UNION ALL`로 비교했다.
 
 #### 12_26_mysql중복제거.ipynb
 * 역할
   * Core 9 decision log 적재 과정에서 발생할 수 있는 중복을 점검했다.
 * 중복 검사
-  * asset_id, date, t_index 기준으로 DB와 CSV 간 중복 여부를 확인했다.
-  * merge indicator를 사용해 left_only / inner 비율을 점검했다.
+  * `asset_id`, `date`, `t_index` 기준으로 DB와 CSV 간 중복 여부를 확인했다.
+  * `merge indicator`를 사용해 `left_only / inner` 비율을 점검했다.
 * 상태 확인
   * DB row 수와 CSV row 수를 비교했다.
   * 중복 삽입 여부를 쿼리로 재확인했다.
@@ -802,7 +802,7 @@
 * 역할
   * Core 9의 최종 해석과 결론을 DB에 봉인했다.
 * 테이블 생성
-  * core9_final_implication_log 테이블을 생성했다.
+  * `core9_final_implication_log` 테이블을 생성했다.
   * 결론을 “로그” 형태로 관리하기 위한 구조로 설계했다.
 * 결론 로그 적재
   * goal_text
