@@ -1,5 +1,4 @@
-# State_Data
-⸻
+# STATE_DATA
 
 ## 전체 프로젝트 구조 (Core-based Architecture)
 
@@ -16,6 +15,7 @@
 | **Core 8** | 보험은 어떤 구조로 진화해야 하는가? | **사건 보험 → 상태 관리 보험** |
 
 ⸻
+
 ## Core별 상세 수행 계획 및 실제 작업 정
 
 ### 🔵 Core 1 — Prediction Feasibility (Healthcare Data + ML — Health Risk Is Predictable)
@@ -383,3 +383,104 @@ health_state_index(t+h) - health_state_index(t)
 * Stage C용 Stress Transform
   * stress_transform(df, gap, noise_sigma)를 정의하고 터리별 t_index 기준으로 iloc[::gap] 다운샘플링을 적용했다.
   * state_value에 정규분포 노이즈 N(0, noise_sigma)를 추가한 후 목적을 정보 밀도(gap)와 노이즈 수준 변화에 따른 예측 안정성 확인으로 설정했다.
+
+⸻
+ 
+### 📅 12월 26일: Core 4 — MySQL 로그 스키마 구축 · 적재 파이프라인 · Rule-based 액션 생성 · Core4 최종 조인 산출
+
+* 공통 작업 목표
+  * Core3에서 만든 state(상태)와 prediction(예측)을 MySQL 로그 테이블로 적재하고 중복 입력/중복 키를 처리할 수 있게 UNIQUE INDEX + INSERT IGNORE + 사전 dedup 구조를 넣었다.
+  * 예측의 불확실성(error_std)만으로 보험 액션(approve/watch/deny) 을 생성한 후 state + prediction + action을 조인한 Core4 최종 결과 CSV를 만들었다.
+
+#### 12_26_main.ipynb
+
+* DB 연결 및 테이블 생성
+  * mysql+pymysql://health_user:...@localhost:3306/HEALTH로 엔진을 생성하고 다음 3개 테이블을 없으면 생성하도록 DDL을 실행했다.
+     * health_state_log
+        * asset_id, t_index, state_value, source, created_at 구조로 만들었다.
+     * prediction_log
+        * asset_id, t_index, y_pred, error_std, model_tag, created_at 구조로 만들었다.
+     * insurance_action_log
+        * asset_id, t_index, action, reason, created_at 구조로 만들었다.
+  * 중복 방지용 UNIQUE INDEX를 만들었다.
+     * health_state_log(asset_id, t_index, source)
+     * prediction_log(asset_id, t_index, model_tag)
+     * insurance_action_log(asset_id, t_index, action)
+  * 이미 인덱스가 있는 경우를 고려해 인덱스 생성 에러는 무시했다.
+
+* 상태 로그 적재 (health + battery) — 중복 제거 포함한 후 source == "health"인 경우만 변환 로직을 적용했다.
+  * user_id → asset_id, health_state_index → state_value로 컬럼을 바꾸고 date를 datetime으로 파싱했다.
+  * asset_id, date 기준 정렬 후 t_index = cumcount()로 생성했다.
+  * source != "health"(nasa/libattery/synthetic)는 asset_id,t_index,state_value가 이미 있다고 보고 그대로 사용했다.
+  * 공통 정제 규칙을 적용하고 state_value를 수치화하고 결측을 제거, asset_id를 문자열로 통일, t_index를 정수로 강제 변환하고 결측을 제거, asset_id,t_index,source 기준 중복행을 제거했다.
+  * insert_health_state_log(df)로 DB에 넣은 후 같은 키(asset_id,t_index,source)가 이미 테이블에 여러 개 있으면 id가 큰 쪽을 삭제하도록 사전 dedup 쿼리를 실행했다.
+  * 이후 INSERT IGNORE로 중복 insert를 막았다.
+  * 다음 파일을 적재했다.
+     * ../data_csv/nasa_core.csv (source="nasa")
+     * ../data_csv/libattery_core.csv (source="libattery")
+     * ../data_csv/synthetic_degradation_core.csv (source="synthetic")
+     * ../data_csv/health_timeseries_core_state.csv (source="health")
+
+* 예측 로그 적재 — core3_output의 *_pred.csv 일괄 적재 (중복 제거 포함)
+  * load_pred_csv(csv_path, model_tag)로 예측 CSV를 적재용 포맷으로 정제하고 필수 컬럼 asset_id,t_index,y_pred,error_std 존재를 강제 체크했다.
+  * t_index,y_pred,error_std를 수치화하고 결측을 제거 후 model_tag는 파일명에서 _pred.csv를 제거한 문자열로 만들었다.
+  * asset_id,t_index,model_tag 기준 중복행을 제거하고 insert_prediction_log(df)로 DB에 넣었다.
+  * 같은 키(asset_id,t_index,model_tag) 중복이 있으면 id 큰 쪽을 삭제하도록 사전 dedup을 실행하고 이후 INSERT IGNORE로 중복 insert를 막았다.
+  * pred_dir = "../data_csv/core3_output"에서 _pred.csv를 전부 찾아 반복 적재했다.
+
+* Rule-based action 생성 — prediction_log 기반
+  * 보험 의사결정 규칙 decide_insurance_action(error_std)를 정의하고 error_std < 0.3이면 approve / low uncertainty로 결정했다.
+  * 0.3 ≤ error_std < 0.7이면 watch / medium uncertainty로 결정한 후 error_std ≥ 0.7이면 deny / high uncertainty로 결정했다.
+  * prediction_log 전체에서 asset_id,t_index,error_std를 읽어오고 각 row에 대해 위 규칙으로 action, reason을 만들었다.
+  * asset_id,t_index,action 기준 중복행을 제거했다.
+
+*  action_log 적재 + 샘플 JOIN 출력
+  * insert_action_log(df)로 insurance_action_log에 넣었고 같은 키(asset_id,t_index,action) 중복이 있으면 id 큰 쪽을 삭제하도록 사전 dedup을 실행했다.
+  * 이후 INSERT IGNORE로 중복 insert를 막았으며 health_state_log + prediction_log + insurance_action_log를 asset_id,t_index로 조인해 20행을 출력했다.
+
+* Core4 최종 산출물 CSV 저장 (Core5 입력)
+  * ../core4_output 폴더를 생성했다.
+  * 다음 조인 결과를 전체 추출해 df_core4로 만들었다.
+     * health_state_log(h)
+     * prediction_log(p)
+     * insurance_action_log(a)
+  * join key는 모두 asset_id,t_index로 고정했다.
+  * df_core4를 ../core4_output/core4_state_prediction_action_log.csv로 저장한 후 확인용으로 상위 20행을 출력했다.
+
+⸻
+
+#### 12_26_Mysql.ipynb
+
+* 목적 및 역할
+  * 12_26_main.ipynb보다 단순한 형태로 MySQL 적재와 액션 생성을 빠르게 재현한 실행본이었다.
+
+* health_state_log 적재
+  * insert_state_log(csv_path, source)를 정의한 후 source == "health"인 경우만 컬럼 매핑과 t_index=cumcount() 생성을 수행했다.
+  * 나머지 nasa/libattery/synthetic은 기존 asset_id,t_index,state_value가 있다고 보고 그대로 적재하고 to_sql(if_exists="append")로 health_state_log에 적재했다.
+
+* prediction_log 적재
+  * insert_prediction_log(csv_path, model_tag)를 정의한 후 예측 CSV에서 asset_id,t_index,y_pred,error_std만 남겼다.
+  * model_tag를 추가해 prediction_log에 append 적재 후 예시는 A/B 일부 파일만 직접 지정해 적재했다.
+
+* 보험 의사결정 규칙 및 action_log 적재
+  * decide_insurance_action(error_std) 규칙을 동일하게 정의하고 insert_action_log_from_prediction(csv_path)로 예측 CSV를 읽어 액션 레코드를 생성했다.
+  * 생성한 액션 레코드를 insurance_action_log에 append 적재했다.
+
+⸻
+
+#### 12_26_mysqlerror.ipynb
+
+* 역할
+  * 이미 적재된 테이블에서 중복이 생긴 상태를 정리하기 위해 생성하였다. 
+
+* health_state_log 중복 정리
+  * SELECT * FROM health_state_log로 전체를 읽었다.
+  * id 기준 정렬 후 asset_id,t_index,source 기준으로 첫 행만 남기고 중복을 제거했다.
+  * TRUNCATE TABLE health_state_log로 테이블을 비운 후 dedup된 데이터를 다시 to_sql(append)로 적재했다.
+  * 정리 전/후 row 수를 출력했다.
+
+* prediction_log 중복 정리
+  * 동일한 방식으로 asset_id,t_index,model_tag 기준 dedup을 수행하고 TRUNCATE → 재적재 순서로 정리했다.
+
+* insurance_action_log 중복 정리
+  * 동일한 방식으로 asset_id,t_index,action 기준 dedup을 수행하고 TRUNCATE → 재적재 순서로 정리했다.
