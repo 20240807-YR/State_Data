@@ -142,46 +142,45 @@
 
 ### 📅 12월 25일: Core 1 — Health State Backbone & State Variable 정의 (12_25_core1main.ipynb)
 * 헬스케어 시계열 Backbone 데이터 로드 및 구조 확인 후 health_timeseries_core_backbone.csv 파일을 로드했습니다.
-* date 컬럼을 datetime으로 변환하고 user_id, date 기준으로 정렬하고 전체 row 수, 사용자 수, 날짜 범위를 확인했습니다. 그 다음 컬럼별 결측치 개수를 점검했습니다.
-* (user_id, date) 기준 중복 행 존재 여부를 확인했습니다. 그리고 사용자별 관측 일수 분포(days per user)를 요약했습니다.
+* date 컬럼을 `datetime`으로 변환하고 `user_id`, `date` 기준으로 정렬하고 전체 row 수, 사용자 수, 날짜 범위를 확인했습니다. 그 다음 컬럼별 결측치 개수를 점검했습니다.
+* `user_id`, `date` 기준 중복 행 존재 여부를 확인했습니다. 그리고 사용자별 관측 일수 분포(days per user)를 요약했습니다.
 * 사용자 샘플 시계열 시각화 하여 상태가 사건이 아님을 확인하였다. 이후에 샘플 사용자 3명을 추출했습니다.
   * 심박 상태 시계열
-  * mean_hr
-  * hr_std
-  * 활동량 시계열
-  * steps
-  * calories
-  * 수면 시계열
-  * sleep_minutes
-* 모든 변수들이 단발 이벤트가 아니라 연속적 상태 변화임을 시각적으로 확인하고 상태 변수 정의 (State Variables)하였습니다. 
+  * `mean_hr`
+  * `hr_std`
+  * `활동량 시계열`
+  * `steps`
+  * `calories`
+  * `수면 시계열`
+  * `sleep_minutes`
+* 모든 변수들이 단발 이벤트가 아니라 연속적 상태 변화임을 시각적으로 확인하고 상태 변수 정의 `State Variables`하였습니다. 
 * 상태 변수로 다음 컬럼을 사용했습니다.
-  * mean_hr
-  * hr_std
-  * steps
-  * sleep_minutes
-* 사용자 기준 Z-score 정규화하고 사용자별 평균·표준편차 기준으로 Z-score를 계산했습니다.분산이 0이거나 결측인 경우 Z-score를 0으로 처리했습니다.
+  * `mean_hr`
+  * `hr_std`
+  * `steps`
+  * `sleep_minutes`
+* 사용자 기준 `Z-score` 정규화하고 사용자별 평균·표준편차 기준으로 `Z-score`를 계산했습니다.분산이 `0`이거나 결측인 경우 `Z-score`를 `0`으로 처리했습니다.
 * 방향성 보정
-  * steps_z → 부하 감소 방향이므로 부호 반전
-  * sleep_minutes_z → 회복 지표이므로 부호 반전
-  * Health State Level 계산 (12_25_core1main.ipynb)
-  * 정규화된 상태 변수들의 평균으로 상태 레벨을 정의했습니다.
+  * `steps_z` → 부하 감소 방향이므로 부호 반전하였습니다.
+  * `sleep_minutes_z` → 회복 지표이므로 부호 반전하였습니다. 
+  * `Health State Level` 계산하여 정규화된 상태 변수들의 평균으로 상태 레벨을 정의했습니다.
 * 계산식
-  * health_state_level = (mean_hr_z + hr_std_z + steps_z + sleep_minutes_z) / 4
-* ealth State Speed 계산 (열화 속도) (12_25_core1main.ipynb)
-  * WINDOW = 7 기준 rolling window를 사용했습니다.
-  * 각 시점에서 과거 상태 레벨의 기울기(선형 회귀 slope)를 계산했습니다.
-  * 사용자별로 정렬 후 health_state_speed 컬럼을 생성했습니다.
+  * `health_state_level = (mean_hr_z + hr_std_z + steps_z + sleep_minutes_z) / 4`
+* ealth State Speed 계산 (열화 속도)
+  * `WINDOW = 7` 기준 `rolling window`를 사용했습니다.
+  * 각 시점에서 과거 상태 레벨의 기울기(`선형 회귀 slope`)를 계산했습니다.
+  * 사용자별로 정렬 후 `health_state_speed` 컬럼을 생성했습니다.
   * 상태의 “수준(Level)”과 “변화 속도(Speed)”를 명확히 분리했습니다. 이후 SOH(상태 수준) + 열화율 대응 논리 고정하였습니다. 
-* 최종 Health State Index 정의 (12_25_core1main.ipynb)
+* 최종 `Health State Index` 정의
   * 상태 수준과 속도를 결합한 단일 지표를 정의했습니다.
 * 계산식
-  * health_state_index = health_state_level + health_state_speed * WINDOW
-* 상태 분포 확인 (사건 아님 재검증) (12_25_core1main.ipynb)
-  * 샘플 사용자별 health_state_index 분포 통계를 출력했습니다.
+  * `health_state_index = health_state_level + health_state_speed * WINDOW`
+* 상태 분포 확인 (사건 아님 재검증)
+  * 샘플 사용자별 `health_state_inde`x 분포 통계를 출력했습니다.
   * 상태가 이산 이벤트가 아닌 연속 분포 상태 변수임을 재확인했습니다.
-* Core State CSV 저장 (12_25_core1main.ipynb)
+* Core State CSV 저장
 * 출력 컬럼
-  * user_id, date
+  * `user_id`, `date`
 * 원천 상태 변수
   * health_state_level
   * health_state_speed
@@ -197,49 +196,47 @@
   * sleepDay_merged.csv
   * 각 파일의 컬럼 목록을 출력해 구조를 사전 점검했습니다.
 * 활동 데이터 일 단위 Backbone 생성하였습니다. 
-  * dailyActivity_merged.csv에서
-  * ActivityDate → date
-  * TotalSteps → steps
-  * Calories → calories
-  * 사용자–날짜 기준 일 단위 activity backbone을 생성했습니다.
+  * dailyActivity_merged.csv에서 아래를 기준으로 사용자–날짜 기준 일 단위 `activity backbone`을 생성했습니다.
+  * `ActivityDate` → `date`
+  * `TotalSteps` → `steps`
+  * `Calories` → `calories`
 * 심박 데이터 일 단위 집계하였습니다. 
   * heartrate_seconds_merged.csv에서 아래를 계산했습니다.
-  * Time → date
+  * `Time` → `date`
   * 사용자–날짜 기준으로
   * 평균 심박(mean_hr)
   * 심박 표준편차(hr_std)
 * 수면 데이터 일 단위 Backbone 생성하였습니다. 
   * sleepDay_merged.csv에서
-  * SleepDay → date
-  * TotalMinutesAsleep → sleep_minutes
-  * 사용자–날짜 기준 수면 backbone을 구성했습니다.
-  * 헬스케어 시계열 Backbone 병합하였습니다.
+  * `SleepDay` → `date`
+  * `TotalMinutesAsleep` → `sleep_minutes`
+  * 사용자–날짜 기준 수면 `backbone`을 구성했습니다.
+  * 헬스케어 시계열 `Backbone` 병합하였습니다.
 * 병합 순서
-	1.	activity × heart rate (left join)
-	2.	결과 × sleep (left join)
-  * 병합 키
-  * user_id
-  * date
+	1.	`activity × heart rate` (left join)
+	2.	`결과 × sleep` (left join)
+* 병합 키
+  * `user_id`
+  * `date`
 * 병합 후 사용자 수, 날짜 수, 결측 요약을 점검했습니다.
 * Core Backbone CSV 저장 (12_25_csv파일merge.ipynb)
   * 저장 파일 : ../data_csv/health_timeseries_core_backbone.csv
 
 ### 📅 12월 25일: Core 2 — Health State Δ예측 (12_25_prediction.ipynb)
-* Core 1 상태 CSV 로드 및 정합성 확인하고 health_timeseries_core_state.csv 파일을 로드했습니다. 그리고 date 컬럼을 datetime으로 변환했습니다.
+* Core 1 상태 CSV 로드 및 정합성 확인하고 health_timeseries_core_state.csv 파일을 로드했습니다. 그리고 `date` 컬럼을 `datetime`으로 변환했습니다.
 * (user_id, date) 기준으로 평균 집계를 수행해 중복을 정리한 후 사용자·날짜 기준으로 정렬했습니다.그리고 전체 row 수, 사용자 수, health_state_index 결측 여부를 확인했습니다.
 * Supervised Dataset 구성 (Δstate 예측 문제 정의) (12_25_prediction.ipynb)
   * 예측 문제를 상태 절대값이 아닌 상태 변화량(Δstate) 예측으로 정의했습니다.
   * 입력(X)
-     * 과거 LOOKBACK = 14일의 health_state_inde 
+     * `과거 LOOKBACK = 14일의 health_state_inde` 
   * 타깃(y)
-     * t + HORIZON(7) 시점의
-health_state_index(t+h) - health_state_index(t)
-* 사용자별 시계열을 유지한 상태로 sliding window를 구성했습니다.
+     * `t + HORIZON(7)` 시점의 `health_state_index(t+h) - health_state_index(t)`
+* 사용자별 시계열을 유지한 상태로 `sliding window`를 구성했습니다.
 * 출력
   * X: (N, lookback)
   * y: (N,)
-  * meta: user_id, t_date, target_date
-* Time-based Train / Validation 분리하여 target_date 기준으로 전체 샘플을 시간 순 정렬했습니다.
+  * meta: `user_id`, `t_date`, `target_date`
+* `Time-based Train / Validation` 분리하여 `target_date` 기준으로 전체 샘플을 시간 순 정렬했습니다.
 * 앞 80%를 train, 뒤 20%를 validation으로 분리한 후 사용자 섞임은 허용하되 미래 정보 누수는 차단했습니다.
 * 모델 1 — Linear Regression (Baseline) 
   * LinearRegression 모델을 사용했습니다.
@@ -299,46 +296,46 @@ health_state_index(t+h) - health_state_index(t)
 #### 12_25_공통포맷정규화.ipynb
 
 * Stage A — NASA (Canonical Degradation)
-  * NASAmetadata.csv를 로드하고 메타 정보로 판단해 battery_id, test_id, uid, filename만 남겼다.
-  * 실제 열화 상태는 discharge 파일의 Capacity/SOH에서 나온다고 판단 후 load_nasa_cell() 함수를 정의하고 discharge 파일을 로드했다.
-  * Capacity를 state_value로 매핑했지만 시간 정보가 없어 t_index = range(len(df))로 정의했다.
-  * 결과 포맷을 asset_id, t_index, state_value로 고정했다.
+  * NASAmetadata.csv를 로드하고 메타 정보로 판단해 `battery_id`, `test_id`, `uid`, `filename`만 남겼다.
+  * 실제 열화 상태는 `discharge` 파일의 `Capacity/SOH`에서 나온다고 판단 후 `load_nasa_cell()` 함수를 정의하고 `discharge` 파일을 로드했다.
+  * `Capacity`를 `state_value`로 매핑했지만 시간 정보가 없어 `t_index = range(len(df))`로 정의했다.
+  * 결과 포맷을 `asset_id`, `t_index`, `state_value`로 고정했다.
 
 * Stage B — liBattery (Real-world Noise)
   * liBattery_Data_Cleaned.csv를 로드했지만 시간 컬럼이 없어 행 순서를 시간으로 가정했다.
-  * t_index = groupby(battery_id).cumcount()로 생성하고 asset_id=battery_id, state_value=Capacity로 통일해 li_core를 생성했다.
+  * `t_index = groupby(battery_id).cumcount()`로 생성하고 `asset_id=battery_id`, `state_value=Capacity`로 통일해 `li_core`를 생성했다.
 
 * Stage C-1 — Synthetic Degradation
-  * battery_degradation.csv를 로드하고 battery_id, time 기준으로 정렬했다. 이후 rul을 이미 계산된 열화 결과로 보고 state_value=rul로 매핑했다.
-  * 배터리별 cumcount()로 t_index를 생성 후 synth_core를 생성했다.
+  * battery_degradation.csv를 로드하고 `battery_id`, `time` 기준으로 정렬했다. 이후 rul을 이미 계산된 열화 결과로 보고 `state_value=rul`로 매핑했다.
+  * 배터리별 `cumcount()`로 `t_index`를 생성 후 `synth_core`를 생성했다.
 
 * Stage C-2 — EV Synthetic
-  * ev_battery_synth.csv를 로드 후 battery_id, charge_cycles 기준으로 정렬하고 t_index=charge_cycles로 직접 사용했다.
-  * state_value=capacity_kWh로 매핑했으며 결과 포맷을 asset_id, t_index, state_value로 통일했다.
+  * ev_battery_synth.csv를 로드 후 `battery_id`, `charge_cycles` 기준으로 정렬하고 `t_index=charge_cycles`로 직접 사용했다.
+  * `state_value=capacity_kWh`로 매핑했으며 결과 포맷을 `asset_id`, `t_index`, `state_value`로 통일했다.
 
 #### 12_25_stage_check.ipynb
 
 * Stage A — nasa_core.csv 생성
-  * NASAmetadata.csv에서 type == "discharge"만 남기고 Capacity 결측 행을 제거했다.
-  * asset_id=str(battery_id), t_index=cumcount(), state_value=Capacity로 nasa_core를 생성했다.
+  * NASAmetadata.csv에서 `type == "discharge"`만 남기고 `Capacity` 결측 행을 제거했다.
+  * `asset_id=str(battery_id)`, `t_index=cumcount()`, `state_value=Capacity`로 `nasa_core`를 생성했다.
   * ../data_csv/nasa_core.csv로 저장했다.
 
 * Stage B — libattery_core.csv 생성
-  * liBattery_Data_Cleaned.csv를 battery_id, uid 기준으로 정렬했다.
-  * asset_id=str(battery_id), t_index=cumcount(), state_value=Capacity로 li_core를 생성했다.
+  * liBattery_Data_Cleaned.csv를 `battery_id`, `uid` 기준으로 정렬했다.
+  * `asset_id=str(battery_id)`, `t_index=cumcount()`, `state_value=Capacity`로 `li_core`를 생성했다.
   * ../data_csv/libattery_core.csv로 저장했다.
 
 * Stage C-1 — synthetic_degradation_core.csv 생성
-  * battery_degradation.csv를 battery_id, time 기준으로 정렬하고 asset_id=str(battery_id), t_index=cumcount(), state_value=rul로 synth_core를 생성했다.
+  * battery_degradation.csv를 `battery_id`, `time` 기준으로 정렬하고 `asset_id=str(battery_id)`, `t_index=cumcount()`, `state_value=rul`로 `synth_core`를 생성했다.
   * ../data_csv/synthetic_degradation_core.csv로 저장했다.
 
 * Stage C-2 — ev_synth_core.csv 생성
-  * ev_battery_synth.csv를 battery_id, charge_cycles 기준으로 정렬했다.
-  * asset_id=str(battery_id), t_index=charge_cycles, state_value=capacity_kWh로 ev_core를 생성했다.
+  * ev_battery_synth.csv를 `battery_id`, `charge_cycles` 기준으로 정렬했다.
+  * `asset_id=str(battery_id)`, `t_index=charge_cycles`, `state_value=capacity_kWh`로 `ev_core`를 생성했다.
   * ../data_csv/ev_synth_core.csv로 저장했다.
 
 #### 12_25_컬럼확인.ipynb
-* CSV 점검 유틸 inspect_csv()를 정의한 후 파일별로 columns, head, null count, row count를 출력했다.
+* CSV 점검 유틸 inspect_csv()를 정의한 후 파일별로 `columns`, `head`, `null count`, `row count`를 출력했다.
 * 점검 대상 파일을 다음으로 고정했다.
   * NASAmetadata.csv
   * liBattery_Data_Cleaned.csv
@@ -353,49 +350,49 @@ health_state_index(t+h) - health_state_index(t)
   * tracking uri를 sqlite:////Users/mac/Desktop/HW/State_Data/mlflow.db로 고정했으며 experiment를 core3_degradation_hierarchical로 고정했다.
 
 * 공통 supervised 생성기
-  * make_supervised_delta()를 정의하고 asset_id별로 t_index 기준 정렬 후 시퀀스를 생성했다.
-  * 입력 X를 lookback 길이의 state_value 시퀀스로 구성했다.
-  * 타깃 y를 state(t+horizon) - state(t) 형태의 Δstate로 정의했다.
-  * state_value를 to_numeric(..., errors="coerce")로 수치화했다.
-  * 입력 또는 타깃에 NaN이 포함된 샘플은 제거하고 Δstate를 현재 시점 t에 매핑되는 값으로 보고 asset_id, t_index(t)를 함께 반환했다.
+  * `make_supervised_delta()`를 정의하고 `asset_id`별로 `t_index` 기준 정렬 후 시퀀스를 생성했다.
+  * 입력 X를 `lookback` 길이의 `state_value` 시퀀스로 구성했다.
+  * 타깃 y를 `state(t+horizon) - state(t)` 형태의 `Δstate`로 정의했다.
+  * `state_value`를 `to_numeric(..., errors="coerce")`로 수치화했다.
+  * 입력 또는 타깃에 NaN이 포함된 샘플은 제거하고 `Δstate`를 현재 시점 t에 매핑되는 값으로 보고 `asset_id`, `t_index(t)`를 함께 반환했다.
 
 * 학습 루틴
-  * train_linear()를 정의한 후 LinearRegression을 학습했다.
-  * val 예측 후 MAE, RMSE, error_std(residual std)를 계산했으며 train_lstm()를 정의했다.
-  * 입력을 X[..., None]로 reshape한 후 모델을 LSTM(32) → Dense(1)로 구성했다.
+  * `train_linear()`를 정의한 후 LinearRegression을 학습했다.
+  * val 예측 후 MAE, RMSE, error_std(residual std)를 계산했으며 `train_lstm()`를 정의했다.
+  * 입력을 `X[..., None]`로 reshape한 후 모델을 `LSTM(32) → Dense(1)`로 구성했다.
   * epochs=20, batch_size=32, Adam(lr=0.001), loss=mse로 학습했다.
   * val 예측 후 MAE, RMSE, error_std를 계산했다.
 
 * Stage별 실행
   * Stage A 입력으로 nasa_core.csv를 사용하고 Stage B 입력으로 libattery_core.csv를 사용했다.
-  * 각 Stage에서 80/20 train–val split을 적용했다.
+  * 각 Stage에서 `80/20 train–val split`을 적용했다.
   * 각 run에 다음을 로깅했다.
      * params: stage, dataset, model_type, lookback, horizon
      * metrics: val_MAE, val_RMSE, error_std
-  * model artifact를 MLflow에 저장했다.
+  * `model artifact`를 MLflow에 저장했다.
 
 * Stage C용 Stress Transform
-  * stress_transform(df, gap, noise_sigma)를 정의하고 터리별 t_index 기준으로 iloc[::gap] 다운샘플링을 적용했다.
-  * state_value에 정규분포 노이즈 N(0, noise_sigma)를 추가한 후 목적을 정보 밀도(gap)와 노이즈 수준 변화에 따른 예측 안정성 확인으로 설정했다.
+  * `stress_transform(df, gap, noise_sigma)`를 정의하고 터리별 `t_index` 기준으로 `iloc[::gap]` 다운샘플링을 적용했다.
+  * `state_value`에 정규분포 노이즈 N(0, noise_sigma)를 추가한 후 목적을 정보 밀도(gap)와 노이즈 수준 변화에 따른 예측 안정성 확인으로 설정했다.
 
 ⸻
  
 ### 📅 12월 26일: Core 4 — MySQL 로그 스키마 구축 · 적재 파이프라인 · Rule-based 액션 생성 · Core4 최종 조인 산출
 
 * 공통 작업 목표
-  * Core3에서 만든 state(상태)와 prediction(예측)을 MySQL 로그 테이블로 적재하고 중복 입력/중복 키를 처리할 수 있게 UNIQUE INDEX + INSERT IGNORE + 사전 dedup 구조를 넣었다.
-  * 예측의 불확실성(error_std)만으로 보험 액션(approve/watch/deny) 을 생성한 후 state + prediction + action을 조인한 Core4 최종 결과 CSV를 만들었다.
+  * Core3에서 만든 `state(상태)`와 `prediction(예측)`을 MySQL 로그 테이블로 적재하고 중복 입력/중복 키를 처리할 수 있게 `UNIQUE INDEX + INSERT IGNORE + 사전 dedup` 구조를 넣었다.
+  * 예측의 불확실성(error_std)만으로 보험 액션(approve/watch/deny) 을 생성한 후 `state + prediction + action`을 조인한 Core4 최종 결과 CSV를 만들었다.
 
 #### 12_26_main.ipynb
 
 * DB 연결 및 테이블 생성
   * mysql+pymysql://health_user:...@localhost:3306/HEALTH로 엔진을 생성하고 다음 3개 테이블을 없으면 생성하도록 DDL을 실행했다.
      * health_state_log
-        * asset_id, t_index, state_value, source, created_at 구조로 만들었다.
+        * `asset_id`, `t_index`, `state_value`, `source`, `created_at` 구조로 만들었다.
      * prediction_log
-        * asset_id, t_index, y_pred, error_std, model_tag, created_at 구조로 만들었다.
+        * `asset_id`, `t_index`, `y_pred`, `error_std`, `model_tag`, `created_at` 구조로 만들었다.
      * insurance_action_log
-        * asset_id, t_index, action, reason, created_at 구조로 만들었다.
+        * `asset_id`, `t_index`, `y_pred`, `error_std`, `model_tag`, `created_at` 구조로 만들었다.
   * 중복 방지용 UNIQUE INDEX를 만들었다.
      * health_state_log(asset_id, t_index, source)
      * prediction_log(asset_id, t_index, model_tag)
@@ -403,12 +400,13 @@ health_state_index(t+h) - health_state_index(t)
   * 이미 인덱스가 있는 경우를 고려해 인덱스 생성 에러는 무시했다.
 
 * 상태 로그 적재 (health + battery) — 중복 제거 포함한 후 source == "health"인 경우만 변환 로직을 적용했다.
-  * user_id → asset_id, health_state_index → state_value로 컬럼을 바꾸고 date를 datetime으로 파싱했다.
-  * asset_id, date 기준 정렬 후 t_index = cumcount()로 생성했다.
-  * source != "health"(nasa/libattery/synthetic)는 asset_id,t_index,state_value가 이미 있다고 보고 그대로 사용했다.
-  * 공통 정제 규칙을 적용하고 state_value를 수치화하고 결측을 제거, asset_id를 문자열로 통일, t_index를 정수로 강제 변환하고 결측을 제거, asset_id,t_index,source 기준 중복행을 제거했다.
-  * insert_health_state_log(df)로 DB에 넣은 후 같은 키(asset_id,t_index,source)가 이미 테이블에 여러 개 있으면 id가 큰 쪽을 삭제하도록 사전 dedup 쿼리를 실행했다.
-  * 이후 INSERT IGNORE로 중복 insert를 막았다.
+  * `user_id → asset_id`, `health_state_index → state_value`로 컬럼을 바꾸고 `date`를 `datetime`으로 파싱했다.
+  * `asset_id`, `date` 기준 정렬 후 `t_index = cumcount()`로 생성했다.
+  * `source != "health"(nasa/libattery/synthetic)`는 `asset_id`,`t_index`,`state_value`가 이미 있다고 보고 그대로 사용했다.
+  * 공통 정제 규칙을 적용하고 `state_value`를 수치화하고 결측을 제거, `asset_id`를 문자열로 통일하였다.
+  * `t_index`를 정수로 강제 변환하고 결측과 `asset_id`,`t_index,source` 기준 중복행을 제거했다.
+  * `insert_health_state_log(df)`로 DB에 넣은 후 같은 키 `asset_id`,`t_index,source`가 이미 테이블에 여러 개 있으면 `id`가 큰 쪽을 삭제하도록 사전 `dedup` 쿼리를 실행했다.
+  * 이후 `INSERT IGNORE`로 중복 `insert`를 막았다.
   * 다음 파일을 적재했다.
      * ../data_csv/nasa_core.csv (source="nasa")
      * ../data_csv/libattery_core.csv (source="libattery")
@@ -416,21 +414,21 @@ health_state_index(t+h) - health_state_index(t)
      * ../data_csv/health_timeseries_core_state.csv (source="health")
 
 * 예측 로그 적재 — core3_output의 *_pred.csv 일괄 적재 (중복 제거 포함)
-  * load_pred_csv(csv_path, model_tag)로 예측 CSV를 적재용 포맷으로 정제하고 필수 컬럼 asset_id,t_index,y_pred,error_std 존재를 강제 체크했다.
-  * t_index,y_pred,error_std를 수치화하고 결측을 제거 후 model_tag는 파일명에서 _pred.csv를 제거한 문자열로 만들었다.
-  * asset_id,t_index,model_tag 기준 중복행을 제거하고 insert_prediction_log(df)로 DB에 넣었다.
-  * 같은 키(asset_id,t_index,model_tag) 중복이 있으면 id 큰 쪽을 삭제하도록 사전 dedup을 실행하고 이후 INSERT IGNORE로 중복 insert를 막았다.
-  * pred_dir = "../data_csv/core3_output"에서 _pred.csv를 전부 찾아 반복 적재했다.
+  * load_pred_csv(csv_path, model_tag)로 예측 CSV를 적재용 포맷으로 정제하고 필수 컬럼 `asset_id`,`t_index`,`y_pred`,`error_std` 존재를 강제 체크했다.
+  * `t_index`,`y_pred`,`error_std`를 수치화하고 결측을 제거 후 `model_tag`는 파일명에서 _pred.csv를 제거한 문자열로 만들었다.
+  * `asset_id`,`t_index,model_tag` 기준 중복행을 제거하고 `insert_prediction_log(df)`로 DB에 넣었다.
+  * 같은 키 `asset_id`,`t_index`,`model_tag` 중복이 있으면 `id` 큰 쪽을 삭제하도록 사전 `dedup`을 실행하고 이후 `INSERT IGNORE`로 중복 `insert`를 막았다.
+  * `pred_dir = "../data_csv/core3_output"`에서 _pred.csv를 전부 찾아 반복 적재했다.
 
 * Rule-based action 생성 — prediction_log 기반
-  * 보험 의사결정 규칙 decide_insurance_action(error_std)를 정의하고 error_std < 0.3이면 approve / low uncertainty로 결정했다.
-  * 0.3 ≤ error_std < 0.7이면 watch / medium uncertainty로 결정한 후 error_std ≥ 0.7이면 deny / high uncertainty로 결정했다.
-  * prediction_log 전체에서 asset_id,t_index,error_std를 읽어오고 각 row에 대해 위 규칙으로 action, reason을 만들었다.
+  * 보험 의사결정 규칙 `decide_insurance_action(error_std)`를 정의하고 `error_std < 0.3`이면 `approve / low uncertainty`로 결정했다.
+  * `0.3 ≤ error_std < 0.7`이면 `watch / medium uncertainty`로 결정한 후 `error_std ≥ 0.7`이면 `deny / high uncertainty`로 결정했다.
+  * `prediction_log` 전체에서 `asset_id`,`t_index,error_std`를 읽어오고 각 row에 대해 위 규칙으로 `action`, `reason`을 만들었다.
   * asset_id,t_index,action 기준 중복행을 제거했다.
 
 *  action_log 적재 + 샘플 JOIN 출력
-  * insert_action_log(df)로 insurance_action_log에 넣었고 같은 키(asset_id,t_index,action) 중복이 있으면 id 큰 쪽을 삭제하도록 사전 dedup을 실행했다.
-  * 이후 INSERT IGNORE로 중복 insert를 막았으며 health_state_log + prediction_log + insurance_action_log를 asset_id,t_index로 조인해 20행을 출력했다.
+  * `insert_action_log(df)`로 `insurance_action_log`에 넣었고 같은 키`asset_id`,`t_index,action` 중복이 있으면 id 큰 쪽을 삭제하도록 사전 `dedup`을 실행했다.
+  * 이후 `INSERT IGNORE`로 중복 insert를 막았으며 `health_state_log + prediction_log + insurance_action_log`를 `asset_id`,`t_index`로 조인해 20행을 출력했다.
 
 * Core4 최종 산출물 CSV 저장 (Core5 입력)
   * ../core4_output 폴더를 생성했다.
@@ -438,7 +436,7 @@ health_state_index(t+h) - health_state_index(t)
      * health_state_log(h)
      * prediction_log(p)
      * insurance_action_log(a)
-  * join key는 모두 asset_id,t_index로 고정했다.
+  * `join key`는 모두 `asset_id`,`t_index`로 고정했다.
   * df_core4를 ../core4_output/core4_state_prediction_action_log.csv로 저장한 후 확인용으로 상위 20행을 출력했다.
 
 #### 12_26_Mysql.ipynb
@@ -447,15 +445,15 @@ health_state_index(t+h) - health_state_index(t)
   * 12_26_main.ipynb보다 단순한 형태로 MySQL 적재와 액션 생성을 빠르게 재현한 실행본이었다.
 
 * health_state_log 적재
-  * insert_state_log(csv_path, source)를 정의한 후 source == "health"인 경우만 컬럼 매핑과 t_index=cumcount() 생성을 수행했다.
-  * 나머지 nasa/libattery/synthetic은 기존 asset_id,t_index,state_value가 있다고 보고 그대로 적재하고 to_sql(if_exists="append")로 health_state_log에 적재했다.
+  * insert_state_log(csv_path, source)를 정의한 후 `source == "health"`인 경우만 컬럼 매핑과 `t_index=cumcount()` 생성을 수행했다.
+  * 나머지 `nasa/libattery/synthetic`은 기존 `asset_id`,`t_index`,`state_value`가 있다고 보고 그대로 적재하고 `to_sql(if_exists="append")`로 health_state_log에 적재했다.
 
 * prediction_log 적재
-  * insert_prediction_log(csv_path, model_tag)를 정의한 후 예측 CSV에서 asset_id,t_index,y_pred,error_std만 남겼다.
-  * model_tag를 추가해 prediction_log에 append 적재 후 예시는 A/B 일부 파일만 직접 지정해 적재했다.
+  * insert_prediction_log(csv_path, model_tag)를 정의한 후 예측 CSV에서 `asset_id`,`t_index`,`y_pred`,`error_std`만 남겼다.
+  * `model_tag`를 추가해 prediction_log에 append 적재 후 예시는 A/B 일부 파일만 직접 지정해 적재했다.
 
 * 보험 의사결정 규칙 및 action_log 적재
-  * decide_insurance_action(error_std) 규칙을 동일하게 정의하고 insert_action_log_from_prediction(csv_path)로 예측 CSV를 읽어 액션 레코드를 생성했다.
+  * `decide_insurance_action(error_std)` 규칙을 동일하게 정의하고 insert_action_log_from_prediction(csv_path)로 예측 CSV를 읽어 액션 레코드를 생성했다.
   * 생성한 액션 레코드를 insurance_action_log에 append 적재했다.
 
 #### 12_26_mysqlerror.ipynb
@@ -464,16 +462,16 @@ health_state_index(t+h) - health_state_index(t)
   * 이미 적재된 테이블에서 중복이 생긴 상태를 정리하기 위해 생성하였다. 
 
 * health_state_log 중복 정리
-  * SELECT * FROM health_state_log로 전체를 읽었다.
-  * id 기준 정렬 후 asset_id,t_index,source 기준으로 첫 행만 남기고 중복을 제거했다.
-  * TRUNCATE TABLE health_state_log로 테이블을 비운 후 dedup된 데이터를 다시 to_sql(append)로 적재했다.
+  * `SELECT * FROM health_state_log`로 전체를 읽었다.
+  * id 기준 정렬 후 `asset_id`,`t_index`,`source` 기준으로 첫 행만 남기고 중복을 제거했다.
+  * TRUNCATE TABLE health_state_log로 테이블을 비운 후 `dedup`된 데이터를 다시 `to_sql(append)`로 적재했다.
   * 정리 전/후 row 수를 출력했다.
 
 * prediction_log 중복 정리
-  * 동일한 방식으로 asset_id,t_index,model_tag 기준 dedup을 수행하고 TRUNCATE → 재적재 순서로 정리했다.
+  * 동일한 방식으로 `asset_id`,`t_index,model_tag` 기준 `dedup`을 수행하고 `TRUNCATE → 재적재 순서`로 정리했다.
 
 * insurance_action_log 중복 정리
-  * 동일한 방식으로 asset_id,t_index,action 기준 dedup을 수행하고 TRUNCATE → 재적재 순서로 정리했다.
+  * 동일한 방식으로 `asset_id`,`t_index`,`action` 기준 `dedup`을 수행하고 `TRUNCATE → 재적재` 순서로 정리했다.
 
 ⸻
 
