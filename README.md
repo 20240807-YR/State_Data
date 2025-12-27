@@ -551,3 +551,70 @@ health_state_index(t+h) - health_state_index(t)
      * intervention_flag
      * stabilized
   * 이를 core5_decision_log.csv로 저장하였으며 Core5 통합 실험 및 상위 제어 로직 입력용 로그로 사용된다.
+
+⸻
+
+### 📅 12월 26일: Core 6 — μHSM(State Monitor) · 상태 추세 계측 · 개입 효과 검증 · Core7 입력 로그 생성
+
+#### 12_26_μHSM_State_Monitor.ipynb
+
+* 공통 목적
+  * 개인 건강 데이터를 사건(event) 이 아니라 연속 상태(state) 로 해석했다.
+  * 상태 수준(state_value)과 상태 추세(degradation_rate)를 분리해 μHSM(State Monitor) 를 구성했다.
+  * 위험군(risk_group)과 상태 추세를 결합한 rule-based 개입이 실제 안정화로 이어지는지 검증 후 Core7 제어/보상 단계에 입력할 의사결정 로그를 생성했다.
+
+* 상태 데이터 로드 및 정규화
+  * health_timeseries_core_state.csv를 로드하고 user_id → asset_id, health_state_index → state_value로 컬럼을 정규화했다.
+  * asset_id, date 기준으로 정렬한 뒤 cumcount()로 날짜 기반 t_index를 생성했다.
+* 상태 변화량 및 추세(degradation_rate) 계산
+  * asset별 state_value.diff()로 delta_state를 계산한 후 delta_state에 rolling(window=7, min_periods=3) 평균을 적용해 단기 열화 추세인 degradation_rate를 계산했다.
+  * 이를 통해 순간 노이즈가 아닌 추세 기반 상태 악화만을 포착했다.
+
+* 외부 위험군(risk_group) 생성 및 매핑
+  * diabetes_dataset.csv를 로드하고 Glucose, BMI, Age, BloodPressure 평균으로 risk_score를 계산했다.
+  * risk_score를 3분위로 나눠 low / mid / high 위험군을 생성했으며 health asset 수만큼 위험군을 샘플링해 asset_id에 매핑했다.
+  * 이 단계는 의료 위험 컨텍스트를 상태 모니터에 결합하는 구조 실험이었다.
+
+* 1차 개입 규칙(intervention_flag) 정의
+  * 다음 rule-based 조건으로 개입 여부를 정의했다.
+     * high 위험군 & degradation_rate < -0.05 → 개입
+     * mid 위험군 & degradation_rate < -0.10 → 개입
+  * 그 외 → 비개입
+  * 이를 intervention_flag (0/1)로 생성했다.
+
+* 안정화(stabilization) 판정 로직
+  * compute_stabilization(df, window) 함수를 정의하고 개입 시점 기준 window 이후의 post_state를 계산했다.
+  * post_state - state_value > 0이면 안정화(stabilized=True)로 판정했으며 기본 window=7 기준으로 안정화 비율을 계산했다.
+
+* 개입 강도 재정의 실험
+  * 개입을 이진 플래그가 아닌 강도로 재정의했다.
+     * high & degradation_rate < -0.1 → "strong"
+     * high or mid & degradation_rate < -0.05 → "weak"
+  * 그 외 → "none"
+  * 개입 강도별 안정화 비율을 비교했다.
+
+* 시간 지연(window) 효과 분석
+  * window를 [3, 7, 14]로 변경하며 안정화 비율을 비교하고 개입 효과가 즉시 반응이 아닌 시간 누적 효과임을 확인했다.
+
+* 개입 효율(Efficiency) 지표 계산
+  * intervention_flag 기준으로 다음을 집계했다.
+     * stabilize_rate = 안정화 비율
+     * count = 샘플 수
+  * efficiency = stabilize_rate / count로 개입 효율 지표를 계산 후 개입 빈도와 효율이 항상 비례하지 않음을 확인했다.
+
+* False Intervention 분석
+  * intervention_flag == 1 이면서 stabilized == False 인 사례를 추출했으며 해당 샘플의 risk_group, degradation_rate 분포 통계를 확인했다.
+  * 개입 실패 영역을 명시적으로 분리했다.
+
+* Core7 입력 로그 생성
+  * 다음 컬럼만 남긴 core5_log를 생성했다.
+     * asset_id
+     * date
+     * t_index
+     * state_value
+     * degradation_rate
+     * risk_group
+     * intervention_flag
+     * stabilized
+  * ../data_csv/core5_decision_log.csv로 저장했다.
+  * 이 로그를 Core7 제어·보상·정책 단계의 입력 데이터로 사용하도록 확정했다.
