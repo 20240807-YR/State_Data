@@ -285,3 +285,101 @@ health_state_index(t+h) - health_state_index(t)
      * prediction_results
      * if_exists="append" 옵션으로 결과를 누적 저장했습니다.
   * Core 2 baseline 예측 결과 저장 완료를 확인했습니다.
+ 
+ ### 📅 12월 25일: Core 3 — 공통 포맷 정규화 · supervised 생성 · MLflow 실험 베이스 구축
+
+* 공통 작업 목표
+  * 출처가 다른 열화 데이터(NASA / liBattery / Synthetic / EV)를 동일한 상태 시계열 구조로 통일했다.
+  * 학습 타깃을 절대 상태값이 아니라 Δstate = state(t+horizon) - state(t)로 고정했다.
+  * 이후 Core 4·5에서 제어, 불확실성, 이식 가능성 비교가 가능하도록 데이터와 실험 구조를 정리했다.
+
+* 공통 데이터 포맷
+  * 모든 Stage 결과를 asset_id, t_index, state_value 3컬럼으로 통일했다.
+
+#### 12_25_공통포맷정규화.ipynb
+
+* Stage A — NASA (Canonical Degradation)
+  * NASAmetadata.csv를 로드하고 메타 정보로 판단해 battery_id, test_id, uid, filename만 남겼다.
+  * 실제 열화 상태는 discharge 파일의 Capacity/SOH에서 나온다고 판단 후 load_nasa_cell() 함수를 정의하고 discharge 파일을 로드했다.
+  * Capacity를 state_value로 매핑했지만 시간 정보가 없어 t_index = range(len(df))로 정의했다.
+  * 결과 포맷을 asset_id, t_index, state_value로 고정했다.
+
+* Stage B — liBattery (Real-world Noise)
+  * liBattery_Data_Cleaned.csv를 로드했지만 시간 컬럼이 없어 행 순서를 시간으로 가정했다.
+  * t_index = groupby(battery_id).cumcount()로 생성하고 asset_id=battery_id, state_value=Capacity로 통일해 li_core를 생성했다.
+
+* Stage C-1 — Synthetic Degradation
+  * battery_degradation.csv를 로드하고 battery_id, time 기준으로 정렬했다. 이후 rul을 이미 계산된 열화 결과로 보고 state_value=rul로 매핑했다.
+  * 배터리별 cumcount()로 t_index를 생성 후 synth_core를 생성했다.
+
+* Stage C-2 — EV Synthetic
+  * ev_battery_synth.csv를 로드 후 battery_id, charge_cycles 기준으로 정렬하고 t_index=charge_cycles로 직접 사용했다.
+  * state_value=capacity_kWh로 매핑했으며 결과 포맷을 asset_id, t_index, state_value로 통일했다.
+
+⸻
+
+#### 12_25_stage_check.ipynb
+
+* Stage A — nasa_core.csv 생성
+  * NASAmetadata.csv에서 type == "discharge"만 남기고 Capacity 결측 행을 제거했다.
+  * asset_id=str(battery_id), t_index=cumcount(), state_value=Capacity로 nasa_core를 생성했다.
+  * ../data_csv/nasa_core.csv로 저장했다.
+
+* Stage B — libattery_core.csv 생성
+  * liBattery_Data_Cleaned.csv를 battery_id, uid 기준으로 정렬했다.
+  * asset_id=str(battery_id), t_index=cumcount(), state_value=Capacity로 li_core를 생성했다.
+  * ../data_csv/libattery_core.csv로 저장했다.
+
+* Stage C-1 — synthetic_degradation_core.csv 생성
+  * battery_degradation.csv를 battery_id, time 기준으로 정렬하고 asset_id=str(battery_id), t_index=cumcount(), state_value=rul로 synth_core를 생성했다.
+  * ../data_csv/synthetic_degradation_core.csv로 저장했다.
+
+* Stage C-2 — ev_synth_core.csv 생성
+  * ev_battery_synth.csv를 battery_id, charge_cycles 기준으로 정렬했다.
+  * asset_id=str(battery_id), t_index=charge_cycles, state_value=capacity_kWh로 ev_core를 생성했다.
+  * ../data_csv/ev_synth_core.csv로 저장했다.
+
+⸻
+
+#### 12_25_컬럼확인.ipynb
+* CSV 점검 유틸 inspect_csv()를 정의한 후 파일별로 columns, head, null count, row count를 출력했다.
+* 점검 대상 파일을 다음으로 고정했다.
+  * NASAmetadata.csv
+  * liBattery_Data_Cleaned.csv
+  * battery_degradation.csv
+  * ev_battery_synth.csv
+  * health_timeseries_core_state.csv
+* 목적을 Stage 정규화에서 실제 사용 가능한 컬럼 구조를 사전에 확정하는 것으로 두었다.
+
+⸻
+
+#### 12_25_공통supervised생성기.ipynb
+
+* MLflow 세팅
+  * tracking uri를 sqlite:////Users/mac/Desktop/HW/State_Data/mlflow.db로 고정했으며 experiment를 core3_degradation_hierarchical로 고정했다.
+
+* 공통 supervised 생성기
+  * make_supervised_delta()를 정의하고 asset_id별로 t_index 기준 정렬 후 시퀀스를 생성했다.
+  * 입력 X를 lookback 길이의 state_value 시퀀스로 구성했다.
+  * 타깃 y를 state(t+horizon) - state(t) 형태의 Δstate로 정의했다.
+  * state_value를 to_numeric(..., errors="coerce")로 수치화했다.
+  * 입력 또는 타깃에 NaN이 포함된 샘플은 제거하고 Δstate를 현재 시점 t에 매핑되는 값으로 보고 asset_id, t_index(t)를 함께 반환했다.
+
+* 학습 루틴
+  * train_linear()를 정의한 후 LinearRegression을 학습했다.
+  * val 예측 후 MAE, RMSE, error_std(residual std)를 계산했으며 train_lstm()를 정의했다.
+  * 입력을 X[..., None]로 reshape한 후 모델을 LSTM(32) → Dense(1)로 구성했다.
+  * epochs=20, batch_size=32, Adam(lr=0.001), loss=mse로 학습했다.
+  * val 예측 후 MAE, RMSE, error_std를 계산했다.
+
+* Stage별 실행
+  * Stage A 입력으로 nasa_core.csv를 사용하고 Stage B 입력으로 libattery_core.csv를 사용했다.
+  * 각 Stage에서 80/20 train–val split을 적용했다.
+  * 각 run에 다음을 로깅했다.
+     * params: stage, dataset, model_type, lookback, horizon
+     * metrics: val_MAE, val_RMSE, error_std
+  * model artifact를 MLflow에 저장했다.
+
+* Stage C용 Stress Transform
+  * stress_transform(df, gap, noise_sigma)를 정의하고 터리별 t_index 기준으로 iloc[::gap] 다운샘플링을 적용했다.
+  * state_value에 정규분포 노이즈 N(0, noise_sigma)를 추가한 후 목적을 정보 밀도(gap)와 노이즈 수준 변화에 따른 예측 안정성 확인으로 설정했다.
