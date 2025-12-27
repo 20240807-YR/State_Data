@@ -729,3 +729,89 @@ health_state_index(t+h) - health_state_index(t)
 * Core 9 연결
   * 보험을 사건 보상(event-driven) 시스템이 아니라 상태 관리(state-managed) 시스템으로 재정의해야 한다는 질문을 던졌다.
   * 이를 Core 9 — From Event-driven Insurance to State-managed Insurance로 연결했다.
+
+⸻
+
+### 📅 12월 26일: Core 9 — State-based Re-decision · MySQL 적재 · 판단 로그 구조 고정 · 최종 결론 봉인
+* 공통 작업 목표
+  * Core 5의 예측 기반 판단 로그를 그대로 유지한 상태에서, μHSM 상태 관측 결과를 판단 입력으로 사용했을 때 의사결정 로그 자체가 어떻게 구조적으로 달라지는지를 재현했다.
+  * 예측값, 규칙 수, 임계값을 변경하지 않고 판단 입력 구조(Prediction → State)**만 변경했다.
+  * Core 5와 1:1 비교 가능한 decision log를 생성하고 이를 MySQL 및 CSV로 고정했다.
+  * 최종적으로 보험을 사건 보상 시스템이 아닌 상태 관리 인프라로 재정의하는 결론을 봉인했다.
+
+#### 12_26_core9B_state_based_redecision.ipynb
+* 역할
+  * Core 5 decision log를 기준으로 μHSM 상태 관측 결과를 병합한 **State-based 재판단 로그(Core 9-B)**를 생성했다.
+  * Core 5와 동일한 stabilization 계산 방식을 유지했다.
+* 입력 데이터 로드
+  * ../data_csv/core5_decision_log.csv를 로드했다.
+  * ../data_csv/muHSM_state_monitor.csv를 로드했다.
+  * user_id를 asset_id로 통일했다.
+* 데이터 병합
+  * asset_id, date 기준으로 Core 5 로그와 μHSM 상태를 left join했다.
+  * 기존 prediction 기반 판단 결과(intervention_flag)는 유지했다.
+* Core 9 판단 규칙 정의 (μHSM 기반)
+  * 규칙 수를 늘리지 않았다.
+  * 임계값을 새로 추가하지 않았다.
+  * 다음 조건 1개로 판단을 고정했다.
+     * HDR < -0.05
+     * recovery_margin < 0.3
+     * observability_score > 0.5
+  * 조건을 만족하면 intervention_flag_core9 = 1로 판정했다.
+* 안정화(stabilization) 계산
+  * Core 5와 동일한 방식으로 계산했다.
+  * asset_id별 state_value를 window=7만큼 shift하여 post_state를 생성했다.
+  * post_state - state_value > 0이면 stabilized=True로 판정했다.
+* Core 9-B decision log 생성
+  * 다음 컬럼으로 decision log를 구성했다.
+     * asset_id
+     * date
+     * t_index
+     * state_value
+     * degradation_rate
+     * HSI
+     * HDR
+     * recovery_margin
+     * observability_score
+     * intervention_flag_core9
+     * stabilized
+* CSV 저장
+  * ../data_csv/core9_state_based_decision_log.csv로 저장했다.
+
+#### 12_26_B_Mysql적재.ipynb
+* 역할
+  * Core 9-B decision log를 MySQL 테이블로 적재했다.
+* 테이블 생성
+  * core9_state_based_decision_log 테이블을 생성했다.
+  * asset_id, date, t_index를 포함한 상태 기반 판단 로그 구조로 정의했다.
+* MySQL 적재
+  * core9_state_based_decision_log.csv를 append 방식으로 적재했다.
+* 적재 확인
+  * 최근 10행을 조회해 적재 결과를 확인했다.
+  * Core 5 vs Core 9 개입 비율을 UNION ALL로 비교했다.
+
+#### 12_26_mysql중복제거.ipynb
+* 역할
+  * Core 9 decision log 적재 과정에서 발생할 수 있는 중복을 점검했다.
+* 중복 검사
+  * asset_id, date, t_index 기준으로 DB와 CSV 간 중복 여부를 확인했다.
+  * merge indicator를 사용해 left_only / inner 비율을 점검했다.
+* 상태 확인
+  * DB row 수와 CSV row 수를 비교했다.
+  * 중복 삽입 여부를 쿼리로 재확인했다.
+
+#### 12_26_mysql.ipynb (Core 9 결론 로그)
+* 역할
+  * Core 9의 최종 해석과 결론을 DB에 봉인했다.
+* 테이블 생성
+  * core9_final_implication_log 테이블을 생성했다.
+  * 결론을 “로그” 형태로 관리하기 위한 구조로 설계했다.
+* 결론 로그 적재
+  * goal_text
+     * 보험을 상태 열화 관리 인프라로 재정의한다는 목표를 기록했다.
+  * final_messages
+     * 예측 성능이 아니라 관측 가능성이 의사결정을 결정한다는 메시지를 기록했다.
+  * portfolio_sentence
+     * 모델을 복잡하게 만들지 않고 상태를 계측 가능하게 만들었다는 문장을 기록했다.
+* CSV 백업
+  * core9_final_implication_log.csv로 별도 저장했다.
